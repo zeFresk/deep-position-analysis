@@ -13,6 +13,9 @@
     <RootNamespace>chess-treepos</RootNamespace>
     <IsWindowsApplication>False</IsWindowsApplication>
     <InterpreterId>Global|PythonCore|3.6</InterpreterId>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <CommandLineArguments>sicilian.epd --nodes=100 --deep=3</CommandLineArguments>
+    <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>

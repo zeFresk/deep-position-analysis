@@ -38,11 +38,11 @@ def explore_rec(board, engine, pv, deepness, nodes):
     sys.stdout.write(">>> 0% : ##\r")
 
     while not cmd.done(): #until search is finished
+        time.sleep(0.100)
         with info_handler:
-            if "nodes" in info_handler.info:
+            if "nodes" in info_handler.info and "pv" in info_handler.info:
                 sys.stdout.write(">>> %d%% : %s\r"%(int((info_handler.info["nodes"]/nodes) * 100),  chess.Board.san(current_board, info_handler.info["pv"][1][0])))
 
-        time.sleep(0.250)
 
     # finshed
     sys.stdout.write("\r>>> 100%% : %s\n"%(chess.Board.san(current_board, info_handler.info["pv"][1][0])))
@@ -52,16 +52,14 @@ def explore_rec(board, engine, pv, deepness, nodes):
     for i in range(1, pv + 1):
         moves += [(info_handler.info["pv"][i][0], info_handler.info["score"][i].cp/100)]
 
-    print(moves)
-
     if deepness == 1:
         return moves
 
     ret = []
-    for mo, cp in moves: # explore new moves
-        new_board = current_board
+    for (mo, cp) in moves: # explore new moves
+        new_board = chess.Board(current_board.fen())
         new_board.push(mo)
-        ret += [[[mo, cp], explore_rec(new_board, engine, pv, deepness-1, nodes)]]
+        ret += [[(mo, cp), explore_rec(new_board, engine, pv, deepness-1, nodes)]]
     
     return ret
 
@@ -75,15 +73,30 @@ def loadOptions(engine):
 
     return ret
 
-def append_variations(tree, pgn):
-    """Append all variation from tree in pgn"""
-
-    if tree == None:
+def append_variations_rec(tree, pgn, depth):
+    if depth < 0:
         return
-  
-    for (move, cp), subtree in tree:
-        node = pgn.add_variation(move, str(cp))
-        append_variations(subtree, node)
+    move = 0
+    cp = 0
+    if depth == 0:
+        move, cp = tree
+    else:
+        move, cp = tree[0]
+    node = pgn.add_variation(move, str(cp))
+    for i in range(1, len(tree)):
+        append_variations(tree[i], node, depth)
+
+def append_variations(tree, pgn, deepness):
+    """Append all variation from tree in pgn"""
+    if deepness == 0:
+        return
+    for i in range(len(tree)): # for each PV
+        append_variations_rec(tree[i], pgn, deepness - 1)
+
+    
+
+
+
 
 
 
@@ -138,7 +151,6 @@ def main():
 
             # We generate variations tree
             tree = explore_rec(board, engine, args.pv, args.deep, args.nodes)
-            print(tree)
 
             # We create pgn to export
             pos_pgn = chess.pgn.Game()
@@ -146,7 +158,7 @@ def main():
             pos_pgn.setup(board)
 
             # We append the tree
-            #append_variations(tree, pos_pgn)
+            append_variations(tree, pos_pgn, args.deep)
 
             # We save the pgn
             print(pos_pgn, file=open("%s_%d.pgn"%(filename, i), "w"), end="\n\n")
