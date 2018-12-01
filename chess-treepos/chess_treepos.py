@@ -7,21 +7,21 @@ import chess.uci
 import sys
 import time
 
-def explore_rec(board, engine, pv, deepness, nodes):
+def explore_rec(board, engine, pv, depth, nodes):
     """
-        Explore the current pgn position 'deepness' move deep using engine
+        Explore the current pgn position 'depth' plys deep using engine
 
         pgn : chess.Board() with an already setup board
         engine : chess.uci already loaded engine
         pv : we will explore top-'pv' moves
-        deepness : deepness of final tree
+        depth : depth of final tree
         nodes : integer representing max nodes to explore per move
 
         Returns tree of moves and associated eval
            
-        Warning : total nodes computed ~ (pv**deepness) * nodes !! Exponential growth !!
+        Warning : total nodes computed ~ (pv**depth) * nodes !! Exponential growth !!
     """
-    if deepness == 0:
+    if depth == 0:
         return None
 
     # Creating handler for multi-PV
@@ -52,14 +52,14 @@ def explore_rec(board, engine, pv, deepness, nodes):
     for i in range(1, pv + 1):
         moves += [(info_handler.info["pv"][i][0], info_handler.info["score"][i].cp/100)]
 
-    if deepness == 1:
+    if depth == 1:
         return moves
 
     ret = []
     for (mo, cp) in moves: # explore new moves
         new_board = chess.Board(current_board.fen())
         new_board.push(mo)
-        ret += [[(mo, cp), explore_rec(new_board, engine, pv, deepness-1, nodes)]]
+        ret += [[(mo, cp), explore_rec(new_board, engine, pv, depth-1, nodes)]]
     
     return ret
 
@@ -86,12 +86,12 @@ def append_variations_rec(tree, pgn, depth):
     for i in range(1, len(tree)):
         append_variations(tree[i], node, depth)
 
-def append_variations(tree, pgn, deepness):
+def append_variations(tree, pgn, depth):
     """Append all variation from tree in pgn"""
-    if deepness == 0:
+    if depth == 0:
         return
     for i in range(len(tree)): # for each PV
-        append_variations_rec(tree[i], pgn, deepness - 1)
+        append_variations_rec(tree[i], pgn, depth - 1)
 
     
 
@@ -106,7 +106,7 @@ def main():
     parser = argparse.ArgumentParser(description="Generate pgn of possible variations from position.")
     parser.add_argument("fen_files", metavar='F', type=str, nargs='+', help="fen file to generate variation from")
     parser.add_argument("--pv", dest="pv", action="store", type=int, default=2, help="number of best moves to explore per node")
-    parser.add_argument("--deep", dest="deep", action="store", type=int, default=2, help="number of ply to explore")
+    parser.add_argument("--depth", dest="depth", action="store", type=int, default=2, help="number of plies to explore")
     parser.add_argument("--nodes", dest="nodes", action="store", type=int, default=50000, help="node used to explore each node in seconds")
 
     args = parser.parse_args()
@@ -150,7 +150,7 @@ def main():
             board = chess.Board(position_str) # We load board
 
             # We generate variations tree
-            tree = explore_rec(board, engine, args.pv, args.deep, args.nodes)
+            tree = explore_rec(board, engine, args.pv, args.depth, args.nodes)
 
             # We create pgn to export
             pos_pgn = chess.pgn.Game()
@@ -158,7 +158,7 @@ def main():
             pos_pgn.setup(board)
 
             # We append the tree
-            append_variations(tree, pos_pgn, args.deep)
+            append_variations(tree, pos_pgn, args.depth)
 
             # We save the pgn
             print(pos_pgn, file=open("%s_%d.pgn"%(filename, i), "w"), end="\n\n")
