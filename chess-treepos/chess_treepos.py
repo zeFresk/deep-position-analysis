@@ -11,6 +11,8 @@ import time
 import os.path
 import io
 
+import re
+
 time_st = 0
 
 def format_nodes(n):
@@ -98,7 +100,9 @@ def explore_rec(board, engine, pv, depth, nodes, msec = None, tot = None):
     # get all moves in an array
     moves = []
     for i in range(1, pv + 1):
-        moves += [(info_handler.info["pv"][i][0], info_handler.info["score"][i].cp/100)]
+        with info_handler:
+            score = 0 if info_handler.info["score"][i].cp == None else info_handler.info["score"][i].cp # to avoid null cp at few nodes
+            moves += [(info_handler.info["pv"][i][0], score/100)]
 
     if depth == 1:
         return moves
@@ -192,6 +196,7 @@ def main():
     parser.add_argument("fen_files", metavar='F', type=str, nargs='+', help="fen file to generate variation from")
     parser.add_argument("-p", "--engine", dest="engine_path", action="store", type=str, required=True, help="path to engine")
     parser.add_argument("-c", "--config", dest="engine_config", action="store", type=str, default="<autodiscover>", help="path to engine configuration")
+    parser.add_argument("--tree", dest="tree_exp", action="store_const", const=True, default=False, help="export final tree directly")
     parser.add_argument("--pv", dest="pv", action="store", type=int, default=2, help="number of best moves to explore per node")
     parser.add_argument("--depth", dest="depth", action="store", type=int, default=2, help="number of plies to explore")
     parser.add_argument("--nodes", dest="nodes", action="store", type=int, default=-1, help="nodes to explore at each step before returning best move")
@@ -241,24 +246,49 @@ def main():
             if args.sec != None: msec = args.sec*1000
             tree = explore_rec(board, engine, args.pv, args.depth, args.nodes, msec)
 
-            # We create pgn to export
-            pos_pgn = chess.pgn.Game()
-            stopping = args.nodes if (args.nodes != None) else args.sec
-            pos_pgn.headers["Event"] = "DeA using %s at %s per move, %d ply-depth, of %s"%(engine.name, stopping, args.depth, position_str)
-            pos_pgn.setup(board)
-
-            # We append the tree
-            append_variations(tree, pos_pgn, args.depth)
-
-            elapsed = time.time() - time_st # in seconds
-            print("Completed position analysis %d of %d from %s in %d hours %d minutes %d seconds.\nSaving result.\n"%(i+1, len(file), filename, elapsed // (60*60), (elapsed // 60)%60, elapsed % 60))
-
-            # We save the pgn
+            #formatting
             index = filename.find(".")
             if index == -1:
                 index = len(filename)
 
             stopping_fmt = (str(args.nodes) +"n") if (args.nodes != None) else (str(args.sec)+"s")
-            print(pos_pgn, file=open("%s%d_%s%dd.pgn"%(filename[0:index], i, stopping_fmt, args.depth), "w"), end="\n\n")
+            full_fmt = "%s%d_%s%dd"%(filename[0:index], i, stopping_fmt, args.depth)
             
+            if not args.tree_exp: #export as pgn
+                # We create pgn to export
+                pos_pgn = chess.pgn.Game()
+                stopping = args.nodes if (args.nodes != None) else args.sec
+                pos_pgn.headers["Event"] = "DeA using %s at %s per move, %d ply-depth, of %s"%(engine.name, stopping, args.depth, position_str)
+                pos_pgn.headers["White"] = engine.name
+                pos_pgn.headers["Black"] = engine.name
+                pos_pgn.setup(board)
+
+                # We append the tree
+                append_variations(tree, pos_pgn, args.depth)
+
+                elapsed = time.time() - time_st # in seconds
+                print("Completed position analysis %d of %d from %s in %d hours %d minutes %d seconds.\nSaving result.\n"%(i+1, len(file), filename, elapsed // (60*60), (elapsed // 60)%60, elapsed % 60))
+
+                # We save the pgn
+                print(pos_pgn, file=open("%s.pgn"%(full_fmt), "w"), end="\n\n")
+
+            else: #export raw tree
+                 # We save the tree
+                print(tree, file=open("%s.tree"%(full_fmt), "w"), end="\n")
+
+                #delete artefacts
+                f = open("%s.tree"%(full_fmt), "r")
+                lines = f.readlines()
+                f.close()
+                out = open("%s.tree"%(full_fmt), "w")
+
+                reg = r"Move\.from_uci\(\'(\w+)\'\)"
+                for l in lines:
+                    l = re.sub(reg, r"\1", l)
+                    l = l.replace("(", "{")
+                    l = l.replace(")", "}")
+                    l = l.replace("[", "{")
+                    l = l.replace("]", "}")
+                    out.write(l)
+
 main()
