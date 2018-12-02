@@ -48,7 +48,7 @@ To *edit engine uci config*, edit the .cfg created in the directory after the fi
 #### Important
 Total number of positions to analyze is given by formula below :
 
-![equation](http://bit.ly/2Q92dfl)
+![equation](https://i.imgur.com/abUhhwE.png)
 
 The **growth is exponential** with depth so take care
 
@@ -72,7 +72,7 @@ I found a bug
 ### It's taking too long !
 Sadly you have to blame the maths.
 
-The total amount of nodes calculated is going to be <img src="http://www.sciweavers.org/tex2img.php?eq=%20%5Ctext%7Bnpm%7D%20%5Ctimes%20%5Csum_%7Bk%3D0%7D%5E%7B%5Ctext%7Bdepth%7D-1%7D%20%5Ctext%7Bpv%7D%5E%7Bk%7D&bc=White&fc=Black&im=jpg&fs=12&ff=arev&edit=0" align="center" border="0" alt=" \text{npm} \times \sum_{k=0}^{\text{depth}-1} \text{pv}^{k}" width="146" height="54" />, where *npm* is the number of nodes per move.
+The total amount of nodes calculated is going to be ![equation2](https://i.imgur.com/by3dVO0.png), where *npm* is the number of nodes per move.
 
 The growth is exponential.
 
