@@ -268,3 +268,4 @@ __pycache__/
 
 # VS related
 *.pyproj
+*.sln
