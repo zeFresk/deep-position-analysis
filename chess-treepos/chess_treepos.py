@@ -94,7 +94,7 @@ def explore_rec(board, engine, pv, depth, nodes, msec = None, tot = None):
 
     # finshed
     out.write("\r" + " "*30) # cleaning line
-    out.write("\r>> 100%% @ {:s}nodes/s : {:s}\n\n".format(format_nodes(int(info_handler.info["nps"])), chess.Board.san(current_board, info_handler.info["pv"][1][0])))
+    out.write("\r>> 100% @ {:s}nodes/s : {:s}\n\n".format(format_nodes(int(info_handler.info["nps"])), chess.Board.san(current_board, info_handler.info["pv"][1][0])))
     out.flush()
 
     # get all moves in an array
@@ -102,9 +102,12 @@ def explore_rec(board, engine, pv, depth, nodes, msec = None, tot = None):
     for i in range(1, pv + 1):
         with info_handler:
             score = 0 if info_handler.info["score"][i].cp == None else info_handler.info["score"][i].cp # to avoid null cp at few nodes
-            moves += [(info_handler.info["pv"][i][0], score/100)]
+            moves += [[info_handler.info["pv"][i][0], score/100]]
 
-    if depth == 1:
+    if depth == 1: #last nodes
+        for i in range(len(moves)):
+            moves[i][0] = info_handler.info["pv"][i+1] # We add the full movelist to the node
+
         return moves
 
     ret = []
@@ -171,13 +174,22 @@ def load_options(engine, config):
 def append_variations_rec(tree, pgn, depth):
     if depth < 0:
         return
-    move = 0
-    cp = 0
+
+    node = None
     if depth == 0:
-        move, cp = tree
+        moves, cp = tree
+        try: #if multiple moves
+            iter(moves)
+            node = pgn.add_variation(moves[0], str(cp))
+            for i in range(1,len(moves)): #until last move
+                node = node.add_variation(moves[i])
+        except TypeError: #only one move
+            node = pgn.add_variation(moves, str(cp))
+
     else:
         move, cp = tree[0]
-    node = pgn.add_variation(move, str(cp))
+        node = pgn.add_variation(move, str(cp))
+
     for i in range(1, len(tree)):
         append_variations(tree[i], node, depth)
 
