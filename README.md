@@ -45,10 +45,17 @@ You only need to know about the command line parameters :
 
 To *edit engine uci config*, edit the .cfg created in the directory after the first use of the said engine.
 
+#### Important
+Total number of positions to analyze is given by formula below :
+
+![equation](http://bit.ly/2Q92dfl)
+
+The **growth is exponential** with depth so take care
+
 ### Example
 > python3 dpa.py -p "C:/Engines/stockfish 10/stockfish_10_x64.exe" --pv=2 --depth 3 --nodes 1000000 sicilian.epd
 
-Will generate a .pgn of 2^3 nodes where each node will be the best move selected after 1M nodes by stockfish 10.
+Will generate a .pgn of 7 nodes where each node will be the best move selected after 1M nodes by stockfish 10.
 
 ### Advanced
 For more commands use `--help`
@@ -63,7 +70,11 @@ I found a bug
 **Then use python 3 and don't forget the dependancies.**
 
 ### It's taking too long !
-Sadly you have to blame the maths : the total amount of nodes calculated is going to be *(pv^depth) x nodes_per_move*, the growth is exponential.
+Sadly you have to blame the maths.
+
+The total amount of nodes calculated is going to be <img src="http://www.sciweavers.org/tex2img.php?eq=%20%5Ctext%7Bnpm%7D%20%5Ctimes%20%5Csum_%7Bk%3D0%7D%5E%7B%5Ctext%7Bdepth%7D-1%7D%20%5Ctext%7Bpv%7D%5E%7Bk%7D&bc=White&fc=Black&im=jpg&fs=12&ff=arev&edit=0" align="center" border="0" alt=" \text{npm} \times \sum_{k=0}^{\text{depth}-1} \text{pv}^{k}" width="146" height="54" />, where *npm* is the number of nodes per move.
+
+The growth is exponential.
 
 Try lowering the nodes count, the pv, or the depth.
 

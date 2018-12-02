@@ -6,6 +6,7 @@ import chess
 import chess.pgn
 import chess.uci
 
+from operator import itemgetter
 import sys
 import time
 import os.path
@@ -42,11 +43,11 @@ def explore_rec(board, engine, pv, depth, nodes, msec = None, tot = None):
 
         Returns tree of moves and associated eval
            
-        Warning : total nodes computed ~ (pv**depth) * nodes !! Exponential growth !!
+        Warning : total nodes computed ~ ((pv**(depth-1)-1)/(pv-1) * nodes !! Exponential growth !!
     """
     global pos_index
     if tot == None: #first turn
-        tot = (pv**depth)-1
+        tot = ((pv**(depth))-1)/(pv-1) # sum of 1 + pv^2 + pv^3 + ... + pv^depth
         pos_index = 0
 
     if depth == 0:
@@ -63,7 +64,7 @@ def explore_rec(board, engine, pv, depth, nodes, msec = None, tot = None):
     engine.position(current_board)
 
     # Starting search
-    elapsed_time = time.clock() - time_st
+    elapsed_time = time.perf_counter() - time_st
 
     if elapsed_time == 0: #avoid divising by 0
         elapsed_time = 1
@@ -251,7 +252,8 @@ def main():
 
             board = chess.Board(position_str) # We load board
 
-            time_st = time.time()
+            global time_st 
+            time_st = time.perf_counter()
 
             # We generate variations tree
             msec = None
@@ -278,7 +280,7 @@ def main():
                 # We append the tree
                 append_variations(tree, pos_pgn, args.depth)
 
-                elapsed = time.time() - time_st # in seconds
+                elapsed = time.perf_counter() - time_st # in seconds
                 print("Completed position analysis %d of %d from %s in %d hours %d minutes %d seconds.\nSaving result.\n"%(i+1, len(file), filename, elapsed // (60*60), (elapsed // 60)%60, elapsed % 60))
 
                 # We save the pgn
