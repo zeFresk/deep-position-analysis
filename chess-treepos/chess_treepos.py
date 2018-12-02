@@ -1,11 +1,15 @@
 # simple generator move tree from a fen using lc0
 
 import argparse
+
 import chess
 import chess.pgn
 import chess.uci
+
 import sys
 import time
+import os.path
+
 
 def explore_rec(board, engine, pv, depth, nodes):
     """
@@ -63,7 +67,24 @@ def explore_rec(board, engine, pv, depth, nodes):
     
     return ret
 
-def loadOptions(engine):
+def write_config(opt, file):
+    """Export options dictionnary to config file."""
+    if "multiPV" in opt:
+         del opt["MultiPV"] # the value will be set by us later
+
+    for key, value in opt.items():
+        file.write("%s = %s\n"%(str(key), str(value)))
+
+def update_options_from_config(opt, file):
+    """Read a config and update dictionnary opt"""
+    data = file.readlines()
+    for line in data:
+        key, val = line.split('=')
+        opt[key.strip()] = val.strip() #remove whitespace
+
+    return opt
+
+def default_options(engine):
     """Returns a dictionnary containing all engine options at their default value"""
     Options = engine.options
     ret = dict()
@@ -72,6 +93,32 @@ def loadOptions(engine):
         ret[Options[e].name] = Options[e].default
 
     return ret
+
+def load_options(engine, config):
+    """ Load engine uci options from config, if no config exists will create one."""
+    if config == "<autodiscover>": #no config provided
+        engine_name = engine.name.split()[0] # first string in name
+        config = engine_name + ".cfg"
+
+        if not os.path.isfile(config): # no existing config file
+            print("\n!Warning: No config file for %s detected, creating one. Default values used.\n"%(engine_name))
+            f = open(config, "w")
+
+            opt = default_options(engine)
+            write_config(opt, f) # exporting config to file
+
+            return opt
+
+    if os.path.isfile(config): # custom or default config exists
+        opt = default_options(engine)
+
+        f = open(config, "r")
+        update_options_from_config(opt, f)
+        return opt
+
+    else: #no config found
+        sys.stderr.write("!!Error: config %s doesn't exists ! Exiting...\n")
+        sys.exit(-2)
 
 def append_variations_rec(tree, pgn, depth):
     if depth < 0:
@@ -93,18 +140,14 @@ def append_variations(tree, pgn, depth):
     for i in range(len(tree)): # for each PV
         append_variations_rec(tree[i], pgn, depth - 1)
 
-    
-
-
-
-
-
 
 def main():
     print("Parsing args...")
     # args parsing
     parser = argparse.ArgumentParser(description="Generate pgn of possible variations from position.")
     parser.add_argument("fen_files", metavar='F', type=str, nargs='+', help="fen file to generate variation from")
+    parser.add_argument("-p", "--engine", dest="engine_path", action="store", type=str, required=True, help="path to engine")
+    parser.add_argument("-c", "--config", dest="engine_config", action="store", type=str, default="<autodiscover>", help="path to engine configuration")
     parser.add_argument("--pv", dest="pv", action="store", type=int, default=2, help="number of best moves to explore per node")
     parser.add_argument("--depth", dest="depth", action="store", type=int, default=2, help="number of plies to explore")
     parser.add_argument("--nodes", dest="nodes", action="store", type=int, default=50000, help="node used to explore each node in seconds")
@@ -114,29 +157,24 @@ def main():
     #engine setup
     print("Setting-up engine")
 
-    engine = chess.uci.popen_engine("E:/Programs/Arena/Engines/Lc0-v19/lc0.exe")
-    engine.uci()
-    #OptionMap({'Threads': Option(name='Threads', type='spin', default=2, min=1, max=128, var=[]), 
-    #'NNCacheSize': Option(name='NNCacheSize', type='spin', default=200000, min=0, max=999999999, var=[]), 
-    #'SyzygyPath': Option(name='SyzygyPath', type='string', default='', min=None, max=None, var=[]), 
-    #'RamLimitMb': Option(name='RamLimitMb', type='spin', default=0, min=0, max=100000000, var=[]), 
-    #'WeightsFile': Option(name='WeightsFile', type='string', default='<autodiscover>', min=None, max=None, var=[]), 
-    #'Backend': Option(name='Backend', type='combo', default='cudnn', min=None, max=None, var=['cudnn', 'cudnn-fp16', 'check', 'random', 'multiplexing']), 
-    #'CacheHistoryLength': Option(name='CacheHistoryLength', type='spin', default=0, min=0, max=7, var=[]), 
-    #'MultiPV': Option(name='MultiPV', type='spin', default=1, min=1, max=500, var=[]), 
-    #'HistoryFill': Option(name='HistoryFill', type='combo', default='fen_only', min=None, max=None, var=['no', 'fen_only', 'always']), 
-    #'ConfigFile': Option(name='ConfigFile', type='string', default='lc0.config', min=None, max=None, var=[]), 
-   
-    opt = loadOptions(engine)
+    if not os.path.isfile(args.engine_path):
+        sys.stderr.write("!!Error: %s engine doesn't exists ! Exiting...\n"%(args.engine_path))
+        sys.exit(-1)
 
-    opt["Threads"] = 2
-    opt["NNCacheSize"] = 200000 * 10 # default *10
-    opt["SyzygyPath"] = "E:/Programs/Arena/TB/syzygy"
-    #opt["RamLimitMb"] = 2**32
-    opt["WeightsFile"] = "E:/Programs/Arena/Engines/Lc0-v19/weights_11250.gz"
-    opt["CacheHistoryLength"] = 2
+    engine_path = args.engine_path
+
+    engine = chess.uci.popen_engine(engine_path)
+    engine.uci()
+   
+    opt = load_options(engine, args.engine_config)
+
+    #opt["Threads"] = 3
+    #opt["NNCacheSize"] = 200000 * 10 # default *10
+    #opt["SyzygyPath"] = "E:/Programs/Arena/TB/syzygy"
+    ##opt["RamLimitMb"] = 2**32
+    #opt["WeightsFile"] = "E:/Programs/Arena/Engines/Lc0-v19/weights_11250.gz"
+    #opt["CacheHistoryLength"] = 2
     opt["MultiPV"] = args.pv
-    opt["HistoryFill"] = "always"
 
     engine.setoption(opt)
 
@@ -154,13 +192,16 @@ def main():
 
             # We create pgn to export
             pos_pgn = chess.pgn.Game()
-            pos_pgn.headers["Event"] = "Deep analysis of %s"%(position_str)
+            pos_pgn.headers["Event"] = "DeA at %d nodes, %d ply-depth, of %s"%(args.nodes, args.depth, position_str)
             pos_pgn.setup(board)
 
             # We append the tree
             append_variations(tree, pos_pgn, args.depth)
 
             # We save the pgn
-            print(pos_pgn, file=open("%s_%d.pgn"%(filename, i), "w"), end="\n\n")
+            index = filename.find(".")
+            if index == -1:
+                index = len(filename)
+            print(pos_pgn, file=open("%s%d_%dn%dd.pgn"%(filename[0:index], i, args.nodes, args.depth), "w"), end="\n\n")
             
 main()

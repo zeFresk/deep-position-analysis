@@ -1,0 +1,13 @@
+[Event "DeA at 100 nodes, 3 ply-depth, of rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2 
+"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "?"]
+[Black "?"]
+[Result "*"]
+[FEN "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"]
+[SetUp "1"]
+
+2. Nc3 { 0.19 } ( 2. Nf3 { 0.19 } 2... d6 { -0.12 } ( 2... Nc6 { -0.27 } 3. Nc3 { 0.33 } ( 3. d4 { 0.32 } ) ) 3. Nc3 { 0.11 } ( 3. Bb5+ { 0.17 } ) ) 2... d6 { -0.11 } ( 2... Nc6 { -0.27 } 3. Nf3 { 0.33 } ( 3. Nge2 { 0.21 } ) ) 3. Nge2 { 0.12 } ( 3. Nf3 { 0.12 } ) *
+
