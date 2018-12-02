@@ -43,6 +43,8 @@ You only need to know about the command line parameters :
 - *--time* : stop exploring **each node** after set amount of time in **seconds**
 - *the position file* in epd or fen format
 
+To *edit engine uci config*, edit the .cfg created in the directory after the first use of the said engine.
+
 ### Example
 > python3 dpa.py -p "C:/Engines/stockfish 10/stockfish_10_x64.exe" --pv=2 --depth 3 --nodes 1000000 sicilian.epd
 
