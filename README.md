@@ -41,6 +41,7 @@ You only need to know about the command line parameters :
 - *-p*/*--engine* : path to engine [**mandatory**]
 - *--nodes* : stop exploring **each node** after set amount of nodes
 - *--time* : stop exploring **each node** after set amount of time in **seconds**
+- *--no-appending* : **do not append** foreshadowed continuation to last nodes. *Off* by default.
 - *the position file* in epd or fen format
 
 To *edit engine uci config*, edit the .cfg created in the directory after the first use of the said engine.
@@ -74,9 +75,7 @@ Sadly you have to blame the maths.
 
 The total amount of nodes calculated is going to be ![equation2](https://i.imgur.com/by3dVO0.png), where *npm* is the number of nodes per move.
 
-The growth is exponential.
-
-Try lowering the nodes count, the pv, or the depth.
+The growth is exponential so try lowering the nodes count, the pv, or the depth.
 
 ### It's a bug I know it
 Submit an issue, I will try to fix it :)

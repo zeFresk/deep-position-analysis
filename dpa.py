@@ -30,7 +30,7 @@ def format_nodes(n, fmt="{:1.1f}"):
         return (fmt+"t").format(n/10**12)
 
 
-def explore_rec(board, engine, pv, depth, nodes, msec = None, tot = None):
+def explore_rec(board, engine, pv, depth, nodes, msec = None, appending = True, tot = None):
     """
         Explore the current pgn position 'depth' plys deep using engine
 
@@ -106,8 +106,9 @@ def explore_rec(board, engine, pv, depth, nodes, msec = None, tot = None):
             moves += [[info_handler.info["pv"][i][0], score/100]]
 
     if depth == 1: #last nodes
-        for i in range(len(moves)):
-            moves[i][0] = info_handler.info["pv"][i+1] # We add the full movelist to the node
+        if appending: # We append all continuation to last node then
+            for i in range(len(moves)):
+                moves[i][0] = info_handler.info["pv"][i+1] # We add the full movelist to the node
 
         return moves
 
@@ -115,7 +116,7 @@ def explore_rec(board, engine, pv, depth, nodes, msec = None, tot = None):
     for (mo, cp) in moves: # explore new moves
         new_board = chess.Board(current_board.fen())
         new_board.push(mo)
-        ret += [[(mo, cp), explore_rec(new_board, engine, pv, depth-1, nodes, msec, tot)]]
+        ret += [[(mo, cp), explore_rec(new_board, engine, pv, depth-1, nodes, msec, appending, tot)]]
     
     return ret
 
@@ -209,11 +210,12 @@ def main():
     parser.add_argument("fen_files", metavar='F', type=str, nargs='+', help="fen file to generate variation from")
     parser.add_argument("-p", "--engine", dest="engine_path", action="store", type=str, required=True, help="path to engine")
     parser.add_argument("-c", "--config", dest="engine_config", action="store", type=str, default="<autodiscover>", help="path to engine configuration")
-    parser.add_argument("--tree", dest="tree_exp", action="store_const", const=True, default=False, help="export final tree directly")
     parser.add_argument("--pv", dest="pv", action="store", type=int, default=2, help="number of best moves to explore per node")
     parser.add_argument("--depth", dest="depth", action="store", type=int, default=2, help="number of plies to explore")
     parser.add_argument("--nodes", dest="nodes", action="store", type=int, default=-1, help="nodes to explore at each step before returning best move")
     parser.add_argument("--time", dest="sec", action="store", type=int, default=-1, help="time in seconds passed at each step before returning best move")
+    parser.add_argument("--tree", dest="tree_exp", action="store_const", const=True, default=False, help="export final tree directly")
+    parser.add_argument("--no-appending", dest="appending", action="store_const", const=False, default=True, help="do not append possible continuation to end nodes.") # carefull, inverted
 
     args = parser.parse_args()
 
@@ -258,7 +260,7 @@ def main():
             # We generate variations tree
             msec = None
             if args.sec != None: msec = args.sec*1000
-            tree = explore_rec(board, engine, args.pv, args.depth, args.nodes, msec)
+            tree = explore_rec(board, engine, args.pv, args.depth, args.nodes, msec, args.appending)
 
             #formatting
             index = filename.find(".")
