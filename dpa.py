@@ -16,18 +16,18 @@ import re
 
 time_st = 0
 
-def format_nodes(n):
+def format_nodes(n, fmt="{:1.1f}"):
     """Select appropriate form for big values."""
     if n < 10**3: #less than 3 digits
         return "%d"%(n)
     elif n < 10**6: #less than 6 digits => Knodes
-        return "{:1.1f}K".format(n/1000)
+        return (fmt+"k").format(n/1000)
     elif n < 10**9: #less than 9 digits => Mnodes
-        return "{:1.1f}M".format(n/10**6)
+        return (fmt+"m").format(n/10**6)
     elif n < 10**12: #less than 9 digits => Gnodes
-        return "{:1.1f}G".format(n/10**9)
+        return (fmt+"g").format(n/10**9)
     else: #more than 10^12
-        return "{:1.1f}T".format(n/10**12)
+        return (fmt+"t").format(n/10**12)
 
 
 def explore_rec(board, engine, pv, depth, nodes, msec = None, tot = None):
@@ -81,21 +81,21 @@ def explore_rec(board, engine, pv, depth, nodes, msec = None, tot = None):
     while not cmd.done(): #until search is finished
         time.sleep(0.100)
         with info_handler:
-            if "nodes" in info_handler.info and "pv" in info_handler.info and "nps" in info_handler.info:
+            if "nodes" in info_handler.info and "pv" in info_handler.info and "nps" in info_handler.info and "score" in info_handler.info:
                 prct = 0
                 if nodes != None: #we use nodes as stop
                     prct = int(info_handler.info["nodes"])/nodes
                 else: # we use time as stop
                     prct = int(info_handler.info["time"])/msec
 
-                out.write("\r" + " "*30) # cleaning line
-                out.write("\r>> {:.1%} @ {:s}nodes/s : {:s}".format(prct, format_nodes(int(info_handler.info["nps"])), chess.Board.san(current_board, info_handler.info["pv"][1][0])))
+                out.write("\r" + " "*40) # cleaning line
+                out.write("\r>> {:.1%} @ {:s}nodes/s : {:s} ({:+.2f})".format(prct, format_nodes(int(info_handler.info["nps"])), chess.Board.san(current_board, info_handler.info["pv"][1][0]), float(info_handler.info["score"][1].cp/100.)))
                 out.flush()
 
 
     # finshed
-    out.write("\r" + " "*30) # cleaning line
-    out.write("\r>> 100% @ {:s}nodes/s : {:s}\n\n".format(format_nodes(int(info_handler.info["nps"])), chess.Board.san(current_board, info_handler.info["pv"][1][0])))
+    out.write("\r" + " "*40) # cleaning line
+    out.write("\r>> 100% @ {:s}nodes/s : {:s} ({:+.2f})\n\n".format(format_nodes(int(info_handler.info["nps"])), chess.Board.san(current_board, info_handler.info["pv"][1][0]), float(info_handler.info["score"][1].cp/100.)))
     out.flush()
 
     # get all moves in an array
@@ -265,8 +265,8 @@ def main():
             if index == -1:
                 index = len(filename)
 
-            stopping_fmt = (str(args.nodes) +"n") if (args.nodes != None) else (str(args.sec)+"s")
-            full_fmt = "%s%d_%s%dd"%(filename[0:index], i, stopping_fmt, args.depth)
+            stopping_fmt = (format_nodes(args.nodes,"{:1.0f}") +"n") if (args.nodes != None) else (str(args.sec)+"s")
+            full_fmt = "%s%d_%s%dv%dp"%(filename[0:index], i, stopping_fmt, args.pv, args.depth)
             
             if not args.tree_exp: #export as pgn
                 # We create pgn to export
