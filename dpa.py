@@ -248,9 +248,24 @@ def main():
 
     for filename in args.fen_files:
         file = open(filename)
-        file = file.readlines()
-        for (i, position_str) in enumerate(file): #iterate through lines
-            print("\nExploring fen %d of %d : [%s]...\n"%(i+1, len(file), position_str.strip()))
+        data = []
+        if filename[-4:] == ".pgn": # pgn input detected we will skip through last position
+            print("PGN input detected we will only analyze from last position(s) reached.")
+
+            game = chess.pgn.read_game(file)
+            while game != None: # there is still at least one game to parse
+                board = game.board() # set up board to initial position
+
+                for move in game.main_line(): # iterate through mainline
+                    board.push(move)
+
+                data += [board.fen()]
+                game = chess.pgn.read_game(file) # try to 
+        else: #standard .fen or .epd
+            data = file.readlines()
+
+        for (i, position_str) in enumerate(data): #iterate through lines
+            print("\nExploring position %d of %d : [%s]...\n"%(i+1, len(data), position_str.strip()))
 
             board = chess.Board(position_str) # We load board
 
@@ -262,6 +277,10 @@ def main():
             if args.sec != None: msec = args.sec*1000
             tree = explore_rec(board, engine, args.pv, args.depth, args.nodes, msec, args.appending)
 
+            # finished : show message
+            elapsed = time.perf_counter() - time_st # in seconds
+            print("Completed position analysis %d of %d from %s in %d hours %d minutes %d seconds.\nSaving result.\n"%(i+1, len(data), filename, elapsed // (60*60), (elapsed // 60)%60, elapsed % 60))
+
             #formatting
             index = filename.find(".")
             if index == -1:
@@ -271,22 +290,37 @@ def main():
             full_fmt = "%s%d_%s%dv%dp"%(filename[0:index], i, stopping_fmt, args.pv, args.depth)
             
             if not args.tree_exp: #export as pgn
-                # We create pgn to export
-                pos_pgn = chess.pgn.Game()
-                stopping = args.nodes if (args.nodes != None) else args.sec
-                pos_pgn.headers["Event"] = "DeA using %s at %s per move, %d ply-depth, of %s"%(engine.name, stopping, args.depth, position_str)
-                pos_pgn.headers["White"] = engine.name
-                pos_pgn.headers["Black"] = engine.name
-                pos_pgn.setup(board)
+                game = None # will contains final game to export to file
+                if filename[-4:] != ".pgn": # input was not a pgn
+                    # We create new game to export
+                    game = chess.pgn.Game()
+                    stopping = (format_nodes(args.nodes,"{:1.0f}") +" nodes") if (args.nodes != None) else (str(args.sec)+" seconds")
+                    game.headers["Event"] = "DeA using %s at %s per move, %d PV, %d ply-depth, of %s"%(engine.name, stopping, args.pv, args.depth, position_str)
+                    game.headers["White"] = engine.name
+                    game.headers["Black"] = engine.name           
 
-                # We append the tree
-                append_variations(tree, pos_pgn, args.depth)
+                    game.setup(board)
 
-                elapsed = time.perf_counter() - time_st # in seconds
-                print("Completed position analysis %d of %d from %s in %d hours %d minutes %d seconds.\nSaving result.\n"%(i+1, len(file), filename, elapsed // (60*60), (elapsed // 60)%60, elapsed % 60))
+                    # We append the tree
+                    append_variations(tree, game, args.depth)
 
-                # We save the pgn
-                print(pos_pgn, file=open("%s.pgn"%(full_fmt), "w"), end="\n\n")
+                else: # input was a pgn we need to append at the end of it
+                    file_tmp = open(filename) # we reload pgn
+
+                    game = chess.pgn.read_game(file_tmp)
+                    for _ in range(i): # skip to i-th game in pgn
+                        game = chess.pgn.read_game(file_tmp)
+
+                    last_node = game.end() # iterate through last node from main variation
+                    stopping = (format_nodes(args.nodes,"{:1.0f}") +" nodes") if (args.nodes != None) else (str(args.sec)+" seconds")
+                    txt = "Deep analysis start after that node"
+                    last_node.comment = txt if (last_node.comment == "") else (last_node.comment + " | %s"%(txt)) # if a comment already exists append analysis msg to it
+
+                    # We append the tree at the end
+                    append_variations(tree, last_node, args.depth)
+
+                # We save the game as pgn
+                print(game, file=open("%s.pgn"%(full_fmt), "w"), end="\n\n")
 
             else: #export raw tree
                  # We save the tree

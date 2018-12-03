@@ -13,11 +13,14 @@ And so I created my own script which allows you to do exactly that !
 
 Overview
 -----------------
-- Analyse any fen or epd position with **any installed engine**.
+- Analyze any fen or epd position with **any installed engine**.
+- Analyze **pgn files**, analysis will start at the last position from main line.
 - Customizable **depth** (*be carefull it grows exponentially*)
 - Customizable number of best moves to explore (**MultiPV**)
 - You can choose between exploring each position for X **nodes** or X **seconds**
 - Supports engine configuration
+- Supports multiple games/positions per file
+- Supports multiple files
 
 
 How to install
@@ -33,7 +36,7 @@ It's really easy : just download the .py and it's dependencies
 How to use
 ----------
 ### Basics
-You only need to know about the command line parameters :
+It's easy, you only need to know about the command line parameters needed :
 - *--depth* : tree depth **in plies**.
 	`--depth=4` will explore position 2 moves deep
 - *--pv* : pick the top-*pv* moves from each position.
@@ -42,9 +45,14 @@ You only need to know about the command line parameters :
 - *--nodes* : stop exploring **each node** after set amount of nodes
 - *--time* : stop exploring **each node** after set amount of time in **seconds**
 - *--no-appending* : **do not append** foreshadowed continuation to last nodes. *Off* by default.
-- *the position file* in epd or fen format
+- *a file* in epd or fen format **OR** a *pgn* (the analysis will start from the last node of the mainline)
 
 To *edit engine uci config*, edit the .cfg created in the directory after the first use of the said engine.
+
+#### About PGN
+If a pgn is feed to the script the output pgn file will contain all the content from the original file.
+
+The analysis (starting from the last node of the main line) will be **appended at the end**.
 
 #### Important
 Total number of positions to analyze is given by formula below :
