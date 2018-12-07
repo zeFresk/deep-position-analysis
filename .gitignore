@@ -89,6 +89,7 @@ ipch/
 *.vsp
 *.vspx
 *.sap
+*.pyperf
 
 # TFS 2012 Local Workspace
 $tf/
@@ -265,6 +266,7 @@ __pycache__/
 *.epd
 *.fen
 *.cfg
+*.rar
 
 # VS related
 *.pyproj

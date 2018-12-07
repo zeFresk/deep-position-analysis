@@ -11,6 +11,7 @@ import sys
 import time
 import os.path
 import io
+import os
 
 import re
 
@@ -29,8 +30,9 @@ def format_nodes(n, fmt="{:1.1f}"):
     else: #more than 10^12
         return (fmt+"t").format(n/10**12)
 
+tot = None # have to be common in order for all recursives calls to show the updates value
 
-def explore_rec(board, engine, pv, depth, nodes, msec = None, appending = True, tot = None):
+def explore_rec(board, engine, pv, depth, nodes, msec = None, appending = True):
     """
         Explore the current pgn position 'depth' plys deep using engine
 
@@ -45,80 +47,91 @@ def explore_rec(board, engine, pv, depth, nodes, msec = None, appending = True, 
            
         Warning : total nodes computed ~ ((pv**(depth-1)-1)/(pv-1) * nodes !! Exponential growth !!
     """
-    global pos_index
-    if tot == None: #first turn
-        tot = ((pv**(depth))-1)/(pv-1) # sum of 1 + pv^2 + pv^3 + ... + pv^depth
-        pos_index = 0
+    try:
+        global pos_index
+        global tot
+        if tot == None: #first turn
+            tot = ((pv**(depth))-1)/(pv-1) # sum of 1 + pv^2 + pv^3 + ... + pv^depth
+            pos_index = 0
 
-    if depth == 0:
-        return None
+        if depth == 0:
+            return None
 
-    pos_index += 1
+        pos_index += 1
 
-    # Creating handler for multi-PV
-    info_handler = chess.uci.InfoHandler()
-    engine.info_handlers.append(info_handler)
+        # Creating handler for multi-PV
+        info_handler = chess.uci.InfoHandler()
+        engine.info_handlers.append(info_handler)
 
-     # Setting-up position for engine
-    current_board = board
-    engine.position(current_board)
+         # Setting-up position for engine
+        current_board = board
+        engine.position(current_board)
 
-    # Starting search
-    elapsed_time = time.perf_counter() - time_st
+        # Starting search
+        elapsed_time = time.perf_counter() - time_st
 
-    if elapsed_time == 0: #avoid divising by 0
-        elapsed_time = 1
+        if elapsed_time == 0: #avoid divising by 0
+            elapsed_time = 1
 
-    sys.stdout.buffer.close = lambda: None # atrocity but needed
-    out = io.TextIOWrapper(sys.stdout.buffer, line_buffering = False)
+        sys.stdout.buffer.close = lambda: None # atrocity but needed
+        out = io.TextIOWrapper(sys.stdout.buffer, line_buffering = False)
 
-    pos_per_s = pos_index/elapsed_time # average positions per second
-    remaining_time_s = (tot-(pos_index-1)) / pos_per_s
-    print(">Analysing variation %d of %d, estimated time remaining : %dh %dm..."%(pos_index, tot, remaining_time_s // (60*60), (remaining_time_s // 60) %60), flush=True)
-    cmd = engine.go(nodes=nodes, movetime=msec, async_callback=True)
-    out.write(">> 0% : ###")
+        pos_per_s = pos_index/elapsed_time # average positions per second
+        remaining_time_s = (tot-(pos_index-1)) / pos_per_s
+        print(">Analysing variation %d of %d, estimated time remaining : %dh %dm..."%(pos_index, tot, remaining_time_s // (60*60), (remaining_time_s // 60) %60), flush=True)
+        cmd = engine.go(nodes=nodes, movetime=msec, async_callback=True)
+        out.write(">> 0% : ###")
 
-    while not cmd.done(): #until search is finished
-        time.sleep(0.100)
+        while not cmd.done(): #until search is finished
+            #time.sleep(0.001) not needed as acquiring ressources already takes time
+            with info_handler:
+                if "nodes" in info_handler.info and "pv" in info_handler.info and "nps" in info_handler.info and "score" in info_handler.info:
+                    prct = 0
+                    if nodes != None: #we use nodes as stop
+                        prct = int(info_handler.info["nodes"])/nodes
+                    else: # we use time as stop
+                        prct = int(info_handler.info["time"])/msec
+
+                    out.write("\r" + " "*40) # cleaning line
+                    out.write("\r>> {:.1%} @ {:s}nodes/s : {:s} ({:+.2f})".format(prct, format_nodes(int(info_handler.info["nps"])), chess.Board.san(current_board, info_handler.info["pv"][1][0]), float(info_handler.info["score"][1].cp/100.)))
+                    out.flush()
+
+
+        # finshed
+        out.write("\r" + " "*40) # cleaning line
+        out.write("\r>> 100% @ {:s}nodes/s : {:s} ({:+.2f})\n\n".format(format_nodes(int(info_handler.info["nps"])), chess.Board.san(current_board, info_handler.info["pv"][1][0]), float(info_handler.info["score"][1].cp/100.)))
+        out.flush()
+
+        # get all moves in an array
+        moves = []
+
         with info_handler:
-            if "nodes" in info_handler.info and "pv" in info_handler.info and "nps" in info_handler.info and "score" in info_handler.info:
-                prct = 0
-                if nodes != None: #we use nodes as stop
-                    prct = int(info_handler.info["nodes"])/nodes
-                else: # we use time as stop
-                    prct = int(info_handler.info["time"])/msec
+            if info_handler.info["multipv"] < pv: #less pv generated than requested, whatever the reason
+                tot -= ((pv**(depth-1))-1)/(pv-1)*(pv - info_handler.info["multipv"]) # We need to update its value because less nodes need to be explored
+            for i in range(1, info_handler.info["multipv"]+1):
+                    score = 0 if info_handler.info["score"][i].cp == None else info_handler.info["score"][i].cp # to avoid null cp at few nodes
+                    moves += [[info_handler.info["pv"][i][0], score/100]]
 
-                out.write("\r" + " "*40) # cleaning line
-                out.write("\r>> {:.1%} @ {:s}nodes/s : {:s} ({:+.2f})".format(prct, format_nodes(int(info_handler.info["nps"])), chess.Board.san(current_board, info_handler.info["pv"][1][0]), float(info_handler.info["score"][1].cp/100.)))
-                out.flush()
+        if depth == 1: #last nodes
+            if appending: # We append all continuation to last node then
+                for i in range(len(moves)):
+                    moves[i][0] = info_handler.info["pv"][i+1] # We add the full movelist to the node
 
+            return moves
 
-    # finshed
-    out.write("\r" + " "*40) # cleaning line
-    out.write("\r>> 100% @ {:s}nodes/s : {:s} ({:+.2f})\n\n".format(format_nodes(int(info_handler.info["nps"])), chess.Board.san(current_board, info_handler.info["pv"][1][0]), float(info_handler.info["score"][1].cp/100.)))
-    out.flush()
-
-    # get all moves in an array
-    moves = []
-    for i in range(1, pv + 1):
-        with info_handler:
-            score = 0 if info_handler.info["score"][i].cp == None else info_handler.info["score"][i].cp # to avoid null cp at few nodes
-            moves += [[info_handler.info["pv"][i][0], score/100]]
-
-    if depth == 1: #last nodes
-        if appending: # We append all continuation to last node then
-            for i in range(len(moves)):
-                moves[i][0] = info_handler.info["pv"][i+1] # We add the full movelist to the node
-
-        return moves
-
-    ret = []
-    for (mo, cp) in moves: # explore new moves
-        new_board = chess.Board(current_board.fen())
-        new_board.push(mo)
-        ret += [[(mo, cp), explore_rec(new_board, engine, pv, depth-1, nodes, msec, appending, tot)]]
+        ret = []
+        for (mo, cp) in moves: # explore new moves
+            new_board = chess.Board(current_board.fen())
+            new_board.push(mo)
+            ret += [[(mo, cp), explore_rec(new_board, engine, pv, depth-1, nodes, msec, appending)]]
     
-    return ret
+        return ret
+    except:
+        print("\nCongratulations, you found a bug ! A bug report is generated in bug.log\nPlease help me correct it by linking the report to your message :)\n")
+        fbug = open("bug.log", "a")
+        fbug.write("bug in fen = [{:s}] with {:s}, PV={:d} NODES={:d}\n\n".format(board.fen(), engine.name, pv, nodes))
+        fbug.close()
+        os._exit(-3)
 
 def write_config(opt, file):
     """Export options dictionnary to config file."""
@@ -182,15 +195,15 @@ def append_variations_rec(tree, pgn, depth):
         moves, cp = tree
         try: #if multiple moves
             iter(moves)
-            node = pgn.add_variation(moves[0], str(cp))
+            node = pgn.add_variation(moves[0], comment=str(cp))
             for i in range(1,len(moves)): #until last move
                 node = node.add_variation(moves[i])
         except TypeError: #only one move
-            node = pgn.add_variation(moves, str(cp))
+            node = pgn.add_variation(moves, comment=str(cp))
 
     else:
         move, cp = tree[0]
-        node = pgn.add_variation(move, str(cp))
+        node = pgn.add_variation(move, comment=str(cp))
 
     for i in range(1, len(tree)):
         append_variations(tree[i], node, depth)
