@@ -309,7 +309,7 @@ def main():
     parser.add_argument("--nodes", dest="nodes", action="store", type=int, default=-1, help="nodes to explore at each step before returning best move")
     parser.add_argument("--time", dest="sec", action="store", type=int, default=-1, help="time in seconds passed at each step before returning best move")
     parser.add_argument("--tree", dest="tree_exp", action="store_const", const=True, default=False, help="export final tree directly")
-    parser.add_argument("--no-appending", dest="appending", action="store_const", const=False, default=True, help="do not append possible continuation to end nodes.") # carefull, inverted
+    parser.add_argument("--appending", dest="appending", action="store_const", const=True, default=False, help="append possible continuation to end nodes.") # carefull, inverted
 
     args = parser.parse_args()
 

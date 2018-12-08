@@ -44,7 +44,7 @@ It's easy, you only need to know about the command line parameters needed :
 - *-p*/*--engine* : path to engine [**mandatory**]
 - *--nodes* : stop exploring **each node** after set amount of nodes
 - *--time* : stop exploring **each node** after set amount of time in **seconds**
-- *--no-appending* : **do not append** foreshadowed continuation to last nodes. *Off* by default.
+- *--appending* : **append** foreshadowed continuation to last nodes. *Off* by default.
 - *a file* in epd or fen format **OR** a *pgn* (the analysis will start from the last node of the mainline)
 
 To *edit engine uci config*, edit the .cfg created in the directory after the first use of the said engine.
@@ -52,7 +52,7 @@ To *edit engine uci config*, edit the .cfg created in the directory after the fi
 #### About PGN
 If a pgn is feed to the script the output pgn file will contain all the content from the original file.
 
-The analysis (starting from the last node of the main line) will be **appended at the end**.
+The analysis (starting from the last node of the main line) will be **appended at the end** if *--appending* is set.
 
 #### Important
 Total number of positions to analyze is given by formula below :
