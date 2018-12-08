@@ -31,6 +31,7 @@ def format_nodes(n, fmt="{:1.1f}"):
         return (fmt+"t").format(n/10**12)
 
 tot = None # have to be common in order for all recursives calls to show the updates value
+info_handler = None
 
 def explore_rec(board, engine, pv, depth, nodes, msec = None, appending = True):
     """
@@ -59,9 +60,11 @@ def explore_rec(board, engine, pv, depth, nodes, msec = None, appending = True):
 
         pos_index += 1
 
-        # Creating handler for multi-PV
-        info_handler = chess.uci.InfoHandler()
-        engine.info_handlers.append(info_handler)
+        # Creating handler for multi-PV if not already defined
+        global info_handler
+        if info_handler == None:
+            info_handler = chess.uci.InfoHandler()
+            engine.info_handlers.append(info_handler)
 
          # Setting-up position for engine
         current_board = board
@@ -126,12 +129,13 @@ def explore_rec(board, engine, pv, depth, nodes, msec = None, appending = True):
             ret += [[(mo, cp), explore_rec(new_board, engine, pv, depth-1, nodes, msec, appending)]]
     
         return ret
-    except:
+    except :
         print("\nCongratulations, you found a bug ! A bug report is generated in bug.log\nPlease help me correct it by linking the report to your message :)\n")
         fbug = open("bug.log", "a")
-        fbug.write("bug in fen = [{:s}] with {:s}, PV={:d} NODES={:d}\n\n".format(board.fen(), engine.name, pv, nodes))
+        e = sys.exc_info()[0]
+        fbug.write("bug in fen = [{:s}] with {:s}, PV={:d} NODES={:d}\nPython Exception :  {:s}".format(board.fen(), engine.name, pv, nodes, str(e)))
         fbug.close()
-        os._exit(-3)
+        os._exit(-3) # for more
 
 def write_config(opt, file):
     """Export options dictionnary to config file."""
