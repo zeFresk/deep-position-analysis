@@ -62,6 +62,84 @@ def get_args():
     return args
 
 
+###########################################
+############## File parsing ###############
+###########################################
+
+def fens_from_file(filename):
+    """Extract all the fen inside a .pgn or .epd"""
+    file = open(filename, "r")
+    fens = []
+
+    if is_pgn(filename): # pgn input detected we will skip through last position
+        print("PGN input detected we will only analyze from last position(s) reached.")
+
+        game = chess.pgn.read_game(file)
+        while game != None: # there is still at least one game to parse
+            board = game.board() # set up board to initial position
+
+            for move in game.main_line(): # iterate through mainline
+                board.push(move)
+
+            fens += [board.fen()]
+            game = chess.pgn.read_game(file) # try to 
+    else: #standard .fen or .epd
+        raw_lines = file.readlines()
+        for l in raw_lines: #extract all fen
+            fens += [extract_fen(l)]
+
+    return fens
+
+def format_filename(filename, index, args):
+    """Returns the output filename given input filename, index and args."""
+    index = filename.find(".")
+    if index == -1:
+        index = len(filename)
+
+    stopping_fmt = (format_nodes(args.nodes,"{:1.0f}") +"n") if (args.nodes != None) else (str(args.sec)+"s")
+    return "%s%d_%s%dv%dp"%(filename[0:index], index, stopping_fmt, args.pv, args.depth)
+
+def new_default_game(board, engine_name, args):
+    """Returns a Game object with the default headers and board set."""
+    game = chess.pgn.Game()
+    stopping = (format_nodes(args.nodes,"{:1.0f}") +" nodes") if (args.nodes != None) else (str(args.sec)+" seconds")
+    game.headers["Event"] = "DeA using {:s} at {:s} per move, {:d} PV, {:d} ply-depth, of {:s}".format(engine_name, stopping, args.pv, args.depth, board.fen())
+    game.headers["White"] = engine_name
+    game.headers["Black"] = engine_name           
+
+    game.setup(board)
+
+    return game
+
+def load_ith_from_pgn(filename, i):
+    """Returns the i-th game of a given pgn named 'filename'."""
+    file_tmp = open(filename) # we reload pgn
+
+    game = chess.pgn.read_game(file_tmp)
+    for _ in range(i): # skip to i-th game in pgn
+        game = chess.pgn.read_game(file_tmp)
+
+    return game
+
+def export_raw_tree(tree, filename): # Warning : Ugly, need to be improved
+    """Export a tree object to a new file called filename."""
+    # We save the tree
+    print(tree, file=open("%s.tree"%(output_filename), "w"), end="\n")
+
+    #delete artefacts
+    f = open("%s.tree"%(output_filename), "r")
+    lines = f.readlines()
+    f.close()
+    out = open("%s.tree"%(output_filename), "w")
+
+    reg = r"Move\.from_uci\(\'(\w+)\'\)"
+    for l in lines:
+        l = re.sub(reg, r"\1", l)
+        l = l.replace("(", "{")
+        l = l.replace(")", "}")
+        l = l.replace("[", "{")
+        l = l.replace("]", "}")
+        out.write(l)
 
 
 ###########################################
@@ -97,6 +175,17 @@ def elapsed_since(timestamp):
     It will always returns at least one."""
     ret = time.perf_counter() - timestamp
     return ret if ret >= 1 else 1
+
+def is_pgn(filename):
+    """Tells if a filename is a pgn."""
+    return filename[-4:] == ".pgn"
+
+def extract_fen(str):
+    """Try to extract a string from a string. Will strip comments and uneeded content."""
+    regex = r"^.*?([\dpPrRnNbBqQkK/]+\s+[wb]\s+[KQkq-]*\s+-\s+\d+\s+\d+).*$"
+    match = re.search(regex, str)
+    return match[1]
+
 
 ###########################################
 ####### Core functions & exploration ######
@@ -154,7 +243,7 @@ class Explorator(object):
 
         self.pos_index = 0 # Number of variations already explored
 
-        #sys.stdout.buffer.close = lambda: None # atrocity but needed
+        sys.stdout.buffer.close = lambda: None # atrocity but needed
         self.out = io.TextIOWrapper(sys.stdout.buffer, line_buffering = False) # We create a common non-buffered output
 
         #################
@@ -372,88 +461,47 @@ def main():
 
     #engine setup
     print("Setting-up engine")
-
     engine_path = args.engine_path
 
     engine = chess.uci.popen_engine(engine_path)
     engine.uci()
    
     opt = load_options(engine, args.engine_config)
-
     opt["MultiPV"] = args.pv
-
     engine.setoption(opt)
 
-
-
     for filename in args.fen_files:
-        file = open(filename)
-        data = []
-        if filename[-4:] == ".pgn": # pgn input detected we will skip through last position
-            print("PGN input detected we will only analyze from last position(s) reached.")
-
-            game = chess.pgn.read_game(file)
-            while game != None: # there is still at least one game to parse
-                board = game.board() # set up board to initial position
-
-                for move in game.main_line(): # iterate through mainline
-                    board.push(move)
-
-                data += [board.fen()]
-                game = chess.pgn.read_game(file) # try to 
-        else: #standard .fen or .epd
-            data = file.readlines()
-
-        for (i, position_str) in enumerate(data): #iterate through lines
-            print("\nExploring position %d of %d : [%s]...\n"%(i+1, len(data), position_str.strip()))
-
+        fens = fens_from_file(filename)
+        
+        for (i, position_str) in enumerate(fens): #iterate through lines
+            position_str = extract_fen(position_str)
+            print("\nExploring position %d of %d : [%s]...\n"%(i+1, len(fens), position_str.strip()))
             board = chess.Board(position_str) # We load board
 
-            global time_st 
-            time_st = time.perf_counter()
-
-            # We generate variations tree
-            msec = None
-            if args.sec != None: msec = args.sec*1000
+            time_st = time.perf_counter() # Setting up starting time to keep track
+            msec = None if args.sec == None else args.sec*1000 # converting seconds to ms if needed
+            
+            # Explore current fen
             exp = Explorator()
             tree = exp.explore(board, engine, args.pv, args.depth, args.nodes, msec, args.appending)
 
             # finished : show message
             elapsed = time.perf_counter() - time_st # in seconds
-            print("Completed position analysis %d of %d from %s in %d hours %d minutes %d seconds.\nSaving result.\n"%(i+1, len(data), filename, elapsed // (60*60), (elapsed // 60)%60, elapsed % 60))
+            print("Completed position analysis %d of %d from %s in %d hours %d minutes %d seconds.\nSaving result.\n"%(i+1, len(fens), filename, elapsed // (60*60), (elapsed // 60)%60, elapsed % 60))
 
-            #formatting
-            index = filename.find(".")
-            if index == -1:
-                index = len(filename)
-
-            stopping_fmt = (format_nodes(args.nodes,"{:1.0f}") +"n") if (args.nodes != None) else (str(args.sec)+"s")
-            full_fmt = "%s%d_%s%dv%dp"%(filename[0:index], i, stopping_fmt, args.pv, args.depth)
+            output_filename = format_filename(filename, i, args) #retrieve output filename without extension
             
             if not args.tree_exp: #export as pgn
                 game = None # will contains final game to export to file
-                if filename[-4:] != ".pgn": # input was not a pgn
-                    # We create new game to export
-                    game = chess.pgn.Game()
-                    stopping = (format_nodes(args.nodes,"{:1.0f}") +" nodes") if (args.nodes != None) else (str(args.sec)+" seconds")
-                    game.headers["Event"] = "DeA using %s at %s per move, %d PV, %d ply-depth, of %s"%(engine.name, stopping, args.pv, args.depth, position_str)
-                    game.headers["White"] = engine.name
-                    game.headers["Black"] = engine.name           
-
-                    game.setup(board)
-
-                    # We append the tree
-                    append_variations(tree, game, args.depth)
+                if not is_pgn(filename): # input was not a pgn
+                    game = new_default_game(board, engine.name, args) # Create a gaame with the correct headers
+                    append_variations(tree, game, args.depth) # Update the game with our computed tree
 
                 else: # input was a pgn we need to append at the end of it
-                    file_tmp = open(filename) # we reload pgn
-
-                    game = chess.pgn.read_game(file_tmp)
-                    for _ in range(i): # skip to i-th game in pgn
-                        game = chess.pgn.read_game(file_tmp)
+                    game = load_ith_from_pgn(filename, i)
 
                     last_node = game.end() # iterate through last node from main variation
-                    stopping = (format_nodes(args.nodes,"{:1.0f}") +" nodes") if (args.nodes != None) else (str(args.sec)+" seconds")
+
                     txt = "Deep analysis start after that node"
                     last_node.comment = txt if (last_node.comment == "") else (last_node.comment + " | %s"%(txt)) # if a comment already exists append analysis msg to it
 
@@ -461,25 +509,10 @@ def main():
                     append_variations(tree, last_node, args.depth)
 
                 # We save the game as pgn
-                print(game, file=open("%s.pgn"%(full_fmt), "w"), end="\n\n")
+                print(game, file=open("%s.pgn"%(output_filename), "w"), end="\n\n")
 
             else: #export raw tree
-                 # We save the tree
-                print(tree, file=open("%s.tree"%(full_fmt), "w"), end="\n")
-
-                #delete artefacts
-                f = open("%s.tree"%(full_fmt), "r")
-                lines = f.readlines()
-                f.close()
-                out = open("%s.tree"%(full_fmt), "w")
-
-                reg = r"Move\.from_uci\(\'(\w+)\'\)"
-                for l in lines:
-                    l = re.sub(reg, r"\1", l)
-                    l = l.replace("(", "{")
-                    l = l.replace(")", "}")
-                    l = l.replace("[", "{")
-                    l = l.replace("]", "}")
-                    out.write(l)
+                export_raw_tree(tree, output_filename)
+                
 
 main()
