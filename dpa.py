@@ -314,6 +314,10 @@ class Explorator(object):
                     ret += [[(mo, cp),[]]] #terminal node
     
             return ret
+        except KeyboardInterrupt as e:
+            raise e
+        except SystemExit as e:
+            sys.exit(e)
         except :
             if not self.crashed_once: # We only print the bug message if we are in the first recursive call
                 print("\nCongratulations, you found a bug ! A bug report is generated in bug.log\nPlease help me correct it by linking the report to your message :)\n")
@@ -529,5 +533,7 @@ def main():
             else: #export raw tree
                 export_raw_tree(tree, output_filename)
                 
-
-main()
+try:
+    main()
+except KeyboardInterrupt:
+    print("\nExiting...")
