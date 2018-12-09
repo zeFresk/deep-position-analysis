@@ -32,6 +32,7 @@ def make_parser():
     parser.add_argument("--depth", dest="depth", action="store", type=int, default=2, help="number of plies to explore")
     parser.add_argument("--nodes", dest="nodes", action="store", type=int, default=-1, help="nodes to explore at each step before returning best move")
     parser.add_argument("--time", dest="sec", action="store", type=int, default=-1, help="time in seconds passed at each step before returning best move")
+    parser.add_argument("--threshold", dest="threshold", action="store", type=int, default=25600, help="stop exploring further if the score (in centipawn) is above threshold.")
     parser.add_argument("--tree", dest="tree_exp", action="store_const", const=True, default=False, help="export final tree directly")
     parser.add_argument("--appending", dest="appending", action="store_const", const=True, default=False, help="append possible continuation to end nodes.") # carefull, inverted
     
@@ -182,7 +183,7 @@ def is_pgn(filename):
 
 def extract_fen(str):
     """Try to extract a string from a string. Will strip comments and uneeded content."""
-    regex = r"^.*?([\dpPrRnNbBqQkK/]+\s+[wb]\s+[KQkq-]*\s+-\s+\d+\s+\d+).*$"
+    regex = r"^.*?([\dpPrRnNbBqQkK\/]+\s+[wb]\s+[KQkq-]*\s+[-]*\w*\s+\d+\s+\d+).*$"
     match = re.search(regex, str)
     return match[1]
 
@@ -217,6 +218,7 @@ class Explorator(object):
         self.pv = None
         self.nodes = None
         self.msec = None
+        self.threshold = None
         self.appending = None
 
         # Variables used globally
@@ -227,7 +229,7 @@ class Explorator(object):
         self.pos_index = None
         self.out = None
 
-    def explore(self, board, engine, pv, depth, nodes, msec = None, appending = True):
+    def explore(self, board, engine, pv, depth, nodes, msec = None, threshold = 25600,appending = True):
         """
             Explore the current pgn position 'depth' plys deep using engine
 
@@ -248,6 +250,7 @@ class Explorator(object):
         self.pv = pv
         self.nodes = nodes
         self.msec = msec
+        self.threshold = threshold/100
         self.appending = appending
         ##################
         # Here are all the variables commons to all recursions
@@ -300,18 +303,18 @@ class Explorator(object):
                 return moves
 
             ret = []
-            for (mo, cp) in moves: # explore new moves
+            for (mo, score) in moves: # explore new moves
                 new_board = copy.deepcopy(board) # We copy the current board
 
                 if not new_board.is_legal(mo): # If the move is illegal (it can happen with Leela)
                     raise RuntimeError("Illegal move : {:s} in {:s}\n".format(new_board.san(mo), new_board.fen())) # We throw an exception
 
                 new_board.push(mo)
-                if not new_board.is_game_over(claim_draw=True): # If the game isn't drawn or won by a player we continue
-                    ret += [[(mo, cp), self._explore_rec(new_board, depth-1)]]
+                if not new_board.is_game_over(claim_draw=True) and not self.above_threshold(score): # If the game isn't drawn or won by a player we continue
+                    ret += [[(mo, score), self._explore_rec(new_board, depth-1)]]
                 else:
                     self.tot -= worst_case_treenodes(self.pv, depth-1) # We need to update its value because less nodes need to be explored
-                    ret += [[(mo, cp),[]]] #terminal node
+                    ret += [[(mo, score),[]]] #terminal node
     
             return ret
 
@@ -335,6 +338,12 @@ class Explorator(object):
 
         fbug.write("bug in fen = [{!s}] with \"{!s}\", PV={:d} NODES={:d} DEPTH={:d}\n####\n{!s}\n\n".format(board.fen(), self.engine.name, self.pv, self.nodes, depth, exception_str))
 
+    def above_threshold(self, score):
+        """Returns wether a score is above threshold or not."""
+        if score[1] == "M": # This a mate score !
+            return 128.0 > self.threshold # A mate value is 128
+        else:
+            return abs(float(score)) > self.threshold
 
     def get_all_moves(self, board, depth):
         """Returns all the first moves computed and update total number of nodes to explore if needed."""
@@ -503,7 +512,7 @@ def main():
             
             # Explore current fen
             exp = Explorator()
-            tree = exp.explore(board, engine, args.pv, args.depth, args.nodes, msec, args.appending)
+            tree = exp.explore(board, engine, args.pv, args.depth, args.nodes, msec, args.threshold, args.appending)
 
             # finished : show message
             elapsed = time.perf_counter() - time_st # in seconds

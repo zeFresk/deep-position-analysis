@@ -18,6 +18,7 @@ Overview
 - Customizable **depth** (*be carefull it grows exponentially*)
 - Customizable number of best moves to explore (**MultiPV**)
 - You can choose between exploring each position for X **nodes** or X **seconds**
+- Customizable **threshold** to stop exploring after a side gained the upper hand.
 - Supports engine configuration
 - Supports multiple games/positions per file
 - Supports multiple files
@@ -44,6 +45,7 @@ It's easy, you only need to know about the command line parameters needed :
 - *-p*/*--engine* : path to engine [**mandatory**]
 - *--nodes* : stop exploring **each node** after set amount of nodes
 - *--time* : stop exploring **each node** after set amount of time in **seconds**
+- *--threshold* : stop exploring **node** further if the score exceeds the given **threshold** for either side (**centipawns**)
 - *--appending* : **append** foreshadowed continuation to last nodes. *Off* by default.
 - *a file* in epd or fen format **OR** a *pgn* (the analysis will start from the last node of the mainline)
 
