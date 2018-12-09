@@ -147,7 +147,7 @@ class Explorator(object):
                 if not new_board.is_game_over(claim_draw=True): # If the game isn't drawn or won by a player we continue
                     ret += [[(mo, cp), self._explore_rec(new_board, depth-1)]]
                 else:
-                    tot -= worst_case_tree_nodes(self.pv, depth-1)*(self.pv - self.info_handler.info["multipv"]) # We need to update its value because less nodes need to be explored
+                    self.tot -= worst_case_treenodes(self.pv, depth-1)*(self.pv - self.info_handler.info["multipv"]) # We need to update its value because less nodes need to be explored
                     ret += [[(mo, cp),[]]] #terminal node
     
             return ret
@@ -157,7 +157,7 @@ class Explorator(object):
                 self.crashed_once = True
 
             self.log_bug("bug.log", board, depth, sys.exc_info())
-            raise # to unstack
+            sys.exit(-3) # to unstack
 
     def log_bug(self, filename, board, depth, exc_tuple):
         """Log an exception which occured in a given board to a file."""
@@ -165,7 +165,7 @@ class Explorator(object):
         fbug = open("bug.log", "a")
         exception_str = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback)) # We format the exception before saving it
 
-        fbug.write("bug in fen = [{:s}] with \"{:s}\", PV={:d} NODES={:d} DEPTH={:d}\n####\n{:s}\n\n".format(board.fen(), self.engine.name, self.pv, self.nodes, depth, exception_str))
+        fbug.write("bug in fen = [{!s}] with \"{!s}\", PV={:d} NODES={:d} DEPTH={:d}\n####\n{!s}\n\n".format(board.fen(), self.engine.name, self.pv, self.nodes, depth, exception_str))
 
 
     def get_all_moves(self, depth):
