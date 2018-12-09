@@ -44,6 +44,7 @@ It's easy, you only need to know about the command line parameters needed :
 - *-p*/*--engine* : path to engine [**mandatory**]
 - *--nodes* : stop exploring **each node** after set amount of nodes
 - *--time* : stop exploring **each node** after set amount of time in **seconds**
+- *--thresold* : stop exploring continuation further if the score exceeds the given **thresold** for either side (**centipawns**)
 - *--appending* : **append** foreshadowed continuation to last nodes. *Off* by default.
 - *a file* in epd or fen format **OR** a *pgn* (the analysis will start from the last node of the mainline)
 
