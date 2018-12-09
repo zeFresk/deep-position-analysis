@@ -310,10 +310,11 @@ class Explorator(object):
                 if not new_board.is_game_over(claim_draw=True): # If the game isn't drawn or won by a player we continue
                     ret += [[(mo, cp), self._explore_rec(new_board, depth-1)]]
                 else:
-                    self.tot -= worst_case_treenodes(self.pv, depth-1)*(self.pv - self.info_handler.info["multipv"]) # We need to update its value because less nodes need to be explored
+                    self.tot -= worst_case_treenodes(self.pv, depth-1) # We need to update its value because less nodes need to be explored
                     ret += [[(mo, cp),[]]] #terminal node
     
             return ret
+
         except KeyboardInterrupt as e:
             raise e
         except SystemExit as e:
