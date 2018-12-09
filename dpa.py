@@ -186,6 +186,24 @@ def extract_fen(str):
     match = re.search(regex, str)
     return match[1]
 
+def normalize(board, num):
+    """Returns num from white POV."""
+    if board.turn == chess.WHITE: # it's white's turn
+        return num
+    else: # Black's turn
+        return -num
+
+def mate_to_cp(mate):
+    return (mate/abs(mate))*128. # (sign of mate * 128)
+
+def normalized_score_str(board, cp, mate):
+    """Returns score as a string from white POV."""
+    if mate != None: # Mate in X
+        return fmt_mate(normalize(board, mate))
+    else: # We only have a centipawn value
+        return "{:+.2f}".format(normalize(board, cp)/100.)
+        
+
 
 ###########################################
 ####### Core functions & exploration ######
@@ -272,7 +290,7 @@ class Explorator(object):
             self.display_position_progress(board, end="\n\n") # Needed if we don't want the line to be blank in case it finished too fast
 
             # get all moves in an array
-            moves = self.get_all_moves(depth) # We extract all moves available
+            moves = self.get_all_moves(board, depth) # We extract all moves available
 
             if depth == 1: #last nodes
                 if self.appending: # We append all continuation to last node then
@@ -313,14 +331,14 @@ class Explorator(object):
         fbug.write("bug in fen = [{!s}] with \"{!s}\", PV={:d} NODES={:d} DEPTH={:d}\n####\n{!s}\n\n".format(board.fen(), self.engine.name, self.pv, self.nodes, depth, exception_str))
 
 
-    def get_all_moves(self, depth):
+    def get_all_moves(self, board, depth):
         """Returns all the first moves computed and update total number of nodes to explore if needed."""
         ret = []
         with self.info_handler: # We need to lock the handler
             if self.info_handler.info["multipv"] < self.pv: #less pv generated than requested, whatever the reason
                 self.tot -= worst_case_treenodes(self.pv, depth-1)*(self.pv - self.info_handler.info["multipv"]) # We need to update its value because less nodes need to be explored
             for i in range(1, self.info_handler.info["multipv"]+1):
-                ret += [[self.info_handler.info["pv"][i][0], self.get_pv_score(i)]]
+                ret += [[self.info_handler.info["pv"][i][0], self.get_pv_score(board, i)]]
         
         return ret
 
@@ -348,15 +366,12 @@ class Explorator(object):
                     prct = 1.00
 
                 self.out.write("\r" + " "*40) # cleaning line
-                self.out.write("\r>> {:.0%} @ {:s}nodes/s : {:s} ({:s}){:s}".format(prct, format_nodes(int(self.info_handler.info["nps"])), chess.Board.san(current_board, self.info_handler.info["pv"][1][0]), self.get_pv_score(1), end))
+                self.out.write("\r>> {:.0%} @ {:s}nodes/s : {:s} ({:s}){:s}".format(prct, format_nodes(int(self.info_handler.info["nps"])), chess.Board.san(current_board, self.info_handler.info["pv"][1][0]), self.get_pv_score(current_board, 1), end))
                 self.out.flush()
 
-    def get_pv_score(self, i):
+    def get_pv_score(self, board, i):
         """Returns score associated to i-th PV formatted as a string. !!! WE SUPPOSE HANDLER IS LOCKED !!!"""
-        if self.info_handler.info["score"][1].cp == None: # Mate or draw
-            return fmt_mate(self.info_handler.info["score"][1].mate)
-        else:
-            return "{:+.2f}".format(self.info_handler.info["score"][1].cp/100.)
+        return normalized_score_str(board, self.info_handler.info["score"][1].cp, self.info_handler.info["score"][i].mate)
 
 
 ###########################################
