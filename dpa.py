@@ -94,14 +94,14 @@ def fens_from_file(filename):
 
     return fens
 
-def format_filename(filename, index, args):
+def format_filename(filename, id, args):
     """Returns the output filename given input filename, index and args."""
     index = filename.find(".")
     if index == -1:
         index = len(filename)
 
     stopping_fmt = (format_nodes(args.nodes,"{:1.0f}") +"n") if (args.nodes != None) else (str(args.sec)+"s")
-    return "%s%d_%s%dv%dp"%(filename[0:index], index, stopping_fmt, args.pv, args.depth)
+    return "%s%d_%s%dv%dp"%(filename[0:index], id, stopping_fmt, args.pv, args.depth)
 
 def new_default_game(board, engine_name, args):
     """Returns a Game object with the default headers and board set."""
@@ -389,7 +389,7 @@ class Explorator(object):
 
     def get_pv_score(self, board, i):
         """Returns score associated to i-th PV formatted as a string. !!! WE SUPPOSE HANDLER IS LOCKED !!!"""
-        return normalized_score_str(board, self.info_handler.info["score"][1].cp, self.info_handler.info["score"][i].mate)
+        return normalized_score_str(board, self.info_handler.info["score"][i].cp, self.info_handler.info["score"][i].mate)
 
 
 ###########################################
