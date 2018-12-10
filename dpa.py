@@ -87,7 +87,10 @@ def fens_from_file(filename):
     else: #standard .fen or .epd
         raw_lines = file.readlines()
         for l in raw_lines: #extract all fen
-            fens += [extract_fen(l)]
+            fen = extract_fen(l)
+            
+            if fen != None: # If we found a fen
+                fens += [fen]
 
     return fens
 
@@ -182,10 +185,11 @@ def is_pgn(filename):
     return filename[-4:] == ".pgn"
 
 def extract_fen(str):
-    """Try to extract a string from a string. Will strip comments and uneeded content."""
-    regex = r"^.*?([\dpPrRnNbBqQkK\/]+\s+[wb]\s+[KQkq-]*\s+[-]*\w*\s+\d+\s+\d+).*$"
+    """Try to extract a string from a string. Will strip comments and uneeded content.
+    Returns None if str is not a valid fen, else returns the match"""
+    regex = r"^.*?([\dpPrRnNbBqQkK\/]+\s+[bw]\s[KkQq-]*[\s-]+\d+\s+\d+).*$"
     match = re.search(regex, str)
-    return match[1]
+    return match[1] if match != None else None
 
 def normalize(board, num):
     """Returns num from white POV."""
@@ -503,7 +507,6 @@ def main():
         fens = fens_from_file(filename)
         
         for (i, position_str) in enumerate(fens): #iterate through lines
-            position_str = extract_fen(position_str)
             print("\nExploring position %d of %d : [%s]...\n"%(i+1, len(fens), position_str.strip()))
             board = chess.Board(position_str) # We load board
 
