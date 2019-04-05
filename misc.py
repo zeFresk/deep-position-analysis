@@ -1,0 +1,65 @@
+import re
+import time
+import chess
+
+###########################################
+############ Helper functions #############
+###########################################
+
+def format_nodes(n, fmt="{:1.1f}"):
+    """Select appropriate form for big values."""
+    if n < 10**3: #less than 3 digits
+        return "%d"%(n)
+    elif n < 10**6: #less than 6 digits => Knodes
+        return (fmt+"k").format(n/1000)
+    elif n < 10**9: #less than 9 digits => Mnodes
+        return (fmt+"m").format(n/10**6)
+    elif n < 10**12: #less than 9 digits => Gnodes
+        return (fmt+"g").format(n/10**9)
+    else: #more than 10^12
+        return (fmt+"t").format(n/10**12)
+
+def fmt_mate(mate_score):
+    """Format a mate value as a proper string."""
+    if mate_score < 0: # mate in X for black
+        return "-M{:d}".format(abs(mate_score))
+    else: # mate in X for white
+        return "+M{:d}".format(abs(mate_score))
+
+def worst_case_treenodes(degree, depth):
+    """Compute the total number of nodes in a tree of constant branching factor for the given depth"""
+    return ((degree**(depth))-1)/(degree-1)
+
+def elapsed_since(timestamp):
+    """Returns elapsed time since a given timestamp in seconds.
+    It will always returns at least one."""
+    ret = time.perf_counter() - timestamp
+    return ret if ret >= 1 else 1
+
+def is_pgn(filename):
+    """Tells if a filename is a pgn."""
+    return filename[-4:] == ".pgn"
+
+def extract_fen(str):
+    """Try to extract a string from a string. Will strip comments and uneeded content.
+    Returns None if str is not a valid fen, else returns the match"""
+    regex = r"^.*?([\dpPrRnNbBqQkK\/]+\s+[bw]\s[KkQq-]*[\s-]+\d+\s+\d+).*$"
+    match = re.search(regex, str)
+    return match[1] if match != None else None
+
+def normalize(board, num):
+    """Returns num from white POV."""
+    if board.turn == chess.WHITE: # it's white's turn
+        return num
+    else: # Black's turn
+        return -num
+
+def mate_to_cp(mate):
+    return (mate/abs(mate))*128. # (sign of mate * 128)
+
+def normalized_score_str(board, cp, mate):
+    """Returns score as a string from white POV."""
+    if mate != None: # Mate in X
+        return fmt_mate(normalize(board, mate))
+    else: # We only have a centipawn value
+        return "{:+.2f}".format(normalize(board, cp)/100.)
