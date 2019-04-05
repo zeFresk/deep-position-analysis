@@ -1,5 +1,6 @@
 import io
 import sys
+import copy
 
 from misc import *
 from uci import *
@@ -26,6 +27,7 @@ class Explorator(object):
         self.info_handler = None
         self.pos_index = None
         self.out = None
+        self.fen_results = None
 
     def explore(self, board, engine, pv, depth, nodes, msec = None, threshold = 25600,appending = True):
         """
@@ -62,6 +64,8 @@ class Explorator(object):
 
         self.pos_index = 0 # Number of variations already explored
 
+        self.fen_results = dict() # (hash_128) -> [(PV,score),...,(PVN,scoreN)]
+
         sys.stdout.buffer.close = lambda: None # atrocity but needed
         self.out = io.TextIOWrapper(sys.stdout.buffer, line_buffering = False) # We create a common non-buffered output
 
@@ -72,61 +76,62 @@ class Explorator(object):
 
     def _explore_rec(self, board, depth): # less parameters so less copy
         """Main recursive function."""
-        try:
-            if depth == 0:
-                return None
+        #try:
+        if depth == 0:
+            return None
 
-            self.pos_index += 1
+        self.pos_index += 1
 
-            # Setting-up position for engine
-            self.engine.position(board)
-            # Start search
-            cmd = self.engine.go(nodes=self.nodes, movetime=self.msec, async_callback=True)
+        # Check if position has already been encountered
+        if hash_fen(board.fen()) in self.fen_results:
             self.display_global_progress()
+            self.display_cached_progress(board)
+            self.tot -= worst_case_treenodes(self.pv, depth-1) # We need to update its value because less nodes need to be explored
+            return None #terminal node
 
-            while not cmd.done(): # until search is finished
-                time.sleep(0.00001) # Sleep for 10 µs to not use full core
-                self.display_position_progress(board)
+        # Setting-up position for engine
+        self.engine.position(board)
+        # Start search
+        cmd = self.engine.go(nodes=self.nodes, movetime=self.msec, async_callback=True)
+        self.display_global_progress()
 
-            self.display_position_progress(board, end="\n\n") # Needed if we don't want the line to be blank in case it finished too fast
+        while not cmd.done(): # until search is finished
+            time.sleep(0.00001) # Sleep for 10 µs to not use full core
+            self.display_position_progress(board)
 
-            # get all moves in an array
-            moves = self.get_all_moves(board, depth) # We extract all moves available
+        self.display_position_progress(board, end="\n\n") # Needed if we don't want the line to be blank in case it finished too fast
 
-            if depth == 1: #last nodes
-                if self.appending: # We append all continuation to last node then
-                    for i in range(len(moves)):
-                        moves[i][0] = self.info_handler.info["pv"][i+1] # We add the full movelist to the node
+        # get full PV's in an array
+        pvs = self.get_all_pvs(board, depth) # We extract all PVs available
+        # add them to dict
+        self.fen_results[hash_fen(board.fen())] = pvs
 
-                return moves
+        for (pv, score) in pvs: # explore new moves
+            new_board = copy.deepcopy(board) # We copy the current board
+            mo = pv[0] # First move in PV
 
-            ret = []
-            for (mo, score) in moves: # explore new moves
-                new_board = copy.deepcopy(board) # We copy the current board
+            if not new_board.is_legal(mo): # If the next move is illegal (it can happen with Leela)
+                raise RuntimeError("Illegal move : {:s} in {:s}\n".format(new_board.san(mo), new_board.fen())) # We throw an exception
 
-                if not new_board.is_legal(mo): # If the move is illegal (it can happen with Leela)
-                    raise RuntimeError("Illegal move : {:s} in {:s}\n".format(new_board.san(mo), new_board.fen())) # We throw an exception
-
-                new_board.push(mo)
-                if not new_board.is_game_over(claim_draw=True) and not self.above_threshold(score): # If the game isn't drawn or won by a player we continue
-                    ret += [[(mo, score), self._explore_rec(new_board, depth-1)]]
-                else:
-                    self.tot -= worst_case_treenodes(self.pv, depth-1) # We need to update its value because less nodes need to be explored
-                    ret += [[(mo, score),[]]] #terminal node
+            new_board.push(mo)
+            if not new_board.is_game_over(claim_draw=True) and not self.above_threshold(score): # If the game isn't drawn or won by a player we continue
+                self._explore_rec(new_board, depth-1)
+            else:
+                self.tot -= worst_case_treenodes(self.pv, depth-1) # We need to update its value because less nodes need to be explored
     
-            return ret
+        return self.fen_results
 
-        except KeyboardInterrupt as e:
-            raise e
-        except SystemExit as e:
-            sys.exit(e)
-        except :
-            if not self.crashed_once: # We only print the bug message if we are in the first recursive call
-                print("\nCongratulations, you found a bug ! A bug report is generated in bug.log\nPlease help me correct it by linking the report to your message :)\n")
-                self.crashed_once = True
+        #except KeyboardInterrupt as e:
+        #    raise e
+        #except SystemExit as e:
+        #    sys.exit(e)
+        #except :
+        #    if not self.crashed_once: # We only print the bug message if we are in the first recursive call
+        #        print("\nCongratulations, you found a bug ! A bug report is generated in bug.log\nPlease help me correct it by linking the report to your message :)\n")
+        #        self.crashed_once = True
 
-            self.log_bug("bug.log", board, depth, sys.exc_info())
-            sys.exit(-3) # to unstack
+        #    self.log_bug("bug.log", board, depth, sys.exc_info())
+        #    sys.exit(-3) # to unstack
 
     def log_bug(self, filename, board, depth, exc_tuple):
         """Log an exception which occured in a given board to a file."""
@@ -143,14 +148,14 @@ class Explorator(object):
         else:
             return abs(float(score)) > self.threshold
 
-    def get_all_moves(self, board, depth):
+    def get_all_pvs(self, board, depth):
         """Returns all the first moves computed and update total number of nodes to explore if needed."""
         ret = []
         with self.info_handler: # We need to lock the handler
             if self.info_handler.info["multipv"] < self.pv: #less pv generated than requested, whatever the reason
                 self.tot -= worst_case_treenodes(self.pv, depth-1)*(self.pv - self.info_handler.info["multipv"]) # We need to update its value because less nodes need to be explored
             for i in range(1, self.info_handler.info["multipv"]+1):
-                ret += [[self.info_handler.info["pv"][i][0], self.get_pv_score(board, i)]]
+                ret += [[self.info_handler.info["pv"][i], self.get_pv_score(board, i)]]
         
         return ret
 
@@ -181,6 +186,20 @@ class Explorator(object):
                 self.out.write("\r>> {:.0%} @ {:s}nodes/s : {:s} ({:s}){:s}".format(prct, format_nodes(int(self.info_handler.info["nps"])), chess.Board.san(current_board, self.info_handler.info["pv"][1][0]), self.get_pv_score(current_board, 1), end))
                 self.out.flush()
 
+    def display_cached_progress(self, current_board):
+        """Display progress made from cached position. Fast. Suppose board IS in dictionnary"""
+        self.out.write("\r" + " "*40) # cleaning line
+        self.out.write("\r>> {:.0%} @ {:s}nodes/s : {:s} ({:s})\n\n".format(1., ".Inf", chess.Board.san(current_board, self.get_pv_cached(current_board, 0)[0]), self.get_pv_score_cached(current_board, 0)))
+        self.out.flush()
+
     def get_pv_score(self, board, i):
         """Returns score associated to i-th PV formatted as a string. !!! WE SUPPOSE HANDLER IS LOCKED !!!"""
         return normalized_score_str(board, self.info_handler.info["score"][i].cp, self.info_handler.info["score"][i].mate)
+
+    def get_pv_cached(self, board, i):
+        """Returns PV in dictionnary."""
+        return self.fen_results[hash_fen(board.fen())][i][0]
+
+    def get_pv_score_cached(self, board, i):
+        """Returns score associated to i-th PV formatted as a string."""
+        return self.fen_results[hash_fen(board.fen())][i][1]

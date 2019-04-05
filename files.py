@@ -85,34 +85,19 @@ def export_raw_tree(tree, filename): # Warning : Ugly, need to be improved
         out.write(l)
 
 ###########################################
-######### Tree parsing functions ##########
+######### Tree exports functions ##########
 ###########################################
 
-def append_variations_rec(tree, pgn, depth):
-    if depth < 0:
-        return
-
-    node = None
-    if depth == 0:
-        moves, cp = tree
-        try: #if multiple moves
-            iter(moves)
-            node = pgn.add_variation(moves[0], comment=str(cp))
-            for i in range(1,len(moves)): #until last move
-                node = node.add_variation(moves[i])
-        except TypeError: #only one move
-            node = pgn.add_variation(moves, comment=str(cp))
-
-    else:
-        move, cp = tree[0]
-        node = pgn.add_variation(move, comment=str(cp))
-
-    for i in range(1, len(tree)):
-        append_variations(tree[i], node, depth)
-
-def append_variations(tree, pgn, depth):
-    """Append all variation from tree in pgn"""
+def append_variations(tree, node, depth):
+    """Append all variation from tree (dict) in pgn"""
     if depth == 0:
         return
-    for i in range(len(tree)): # for each PV
-        append_variations_rec(tree[i], pgn, depth - 1)
+    
+    start_fen = node.board().fen() # fen to start with
+    h = hash_fen(start_fen)
+    if h in tree:
+        pvs = tree[hash_fen(start_fen)] # we get all pvs from this fen
+        for pv in pvs:
+            moves, score = pv
+            child = node.add_variation(moves[0], comment=score)
+            append_variations(tree, child, depth-1)

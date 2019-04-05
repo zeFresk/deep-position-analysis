@@ -1,6 +1,7 @@
 import re
 import time
 import chess
+import hashlib
 
 ###########################################
 ############ Helper functions #############
@@ -63,3 +64,9 @@ def normalized_score_str(board, cp, mate):
         return fmt_mate(normalize(board, mate))
     else: # We only have a centipawn value
         return "{:+.2f}".format(normalize(board, cp)/100.)
+
+def hash_fen(fen_str):
+    """Hash a string and returns a 128-bytes number. Low collisions."""
+    h = hashlib.md5()
+    h.update(fen_str.encode("ascii")) #feed the fen to hash function
+    return int.from_bytes(h.digest(), byteorder='little', signed=False) # Returns a big number
