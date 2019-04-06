@@ -13,6 +13,7 @@ def make_parser():
 
     parser.add_argument("fen_files", metavar='F', type=str, nargs='+', help="fen file to generate variation from")
     parser.add_argument("-p", "--engine", dest="engine_path", action="store", type=str, required=True, help="path to engine")
+    parser.add_argument("--no-cache", dest="use_cache", action="store_const", const=False, default=True, help="use cache (increase I/O)")
     parser.add_argument("-c", "--config", dest="engine_config", action="store", type=str, default="<autodiscover>", help="path to engine configuration")
     parser.add_argument("--pv", dest="pv", action="store", type=int, default=2, help="number of best moves to explore per node")
     parser.add_argument("--depth", dest="depth", action="store", type=int, default=2, help="number of plies to explore")

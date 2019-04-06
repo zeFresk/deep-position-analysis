@@ -14,6 +14,7 @@ class Explorator(object):
         """Create an empty Explorator"""
         # Variables used to avoid copy (as if we copied the stack)
         self.engine = None
+        self.cache = None
         self.pv = None
         self.nodes = None
         self.msec = None
@@ -29,7 +30,7 @@ class Explorator(object):
         self.out = None
         self.fen_results = None
 
-    def explore(self, board, engine, pv, depth, nodes, msec = None, threshold = 25600,appending = True):
+    async def explore(self, board, engine, cache, pv, depth, nodes, msec = None, threshold = 25600,appending = True):
         """
             Explore the current pgn position 'depth' plys deep using engine
 
@@ -47,6 +48,7 @@ class Explorator(object):
         ##################
         # Stack optimization
         self.engine = engine
+        self.cache = cache
         self.pv = pv
         self.nodes = nodes
         self.msec = msec
@@ -71,10 +73,13 @@ class Explorator(object):
 
         #################
         # We then need to call the main function
-        return self._explore_rec(board, depth)
+        ret = await self._explore_rec(board, depth)
+        if cache != None:
+            await self.cache.wait_write()
+        return ret
 
 
-    def _explore_rec(self, board, depth): # less parameters so less copy
+    async def _explore_rec(self, board, depth): # less parameters so less copy
         """Main recursive function."""
         #try:
         if depth == 0:
@@ -82,12 +87,18 @@ class Explorator(object):
 
         self.pos_index += 1
 
+        hf = hash_fen(board.fen())
+
         # Check if position has already been encountered
-        if hash_fen(board.fen()) in self.fen_results:
+        if hf in self.fen_results:
             self.display_global_progress()
             self.display_cached_progress(board)
             self.tot -= worst_case_treenodes(self.pv, depth-1) # We need to update its value because less nodes need to be explored
             return None #terminal node
+
+        # Start search in cache
+        if self.cache != None and self.nodes != None:
+            await self.cache.search_fen(self.nodes, hf)
 
         # Setting-up position for engine
         self.engine.position(board)
@@ -96,15 +107,27 @@ class Explorator(object):
         self.display_global_progress()
 
         while not cmd.done(): # until search is finished
+            if self.cache != None and self.cache.fen_found(hf): # found in cache
+                self.engine.stop()
+                break
+
             time.sleep(0.00001) # Sleep for 10 µs to not use full core
             self.display_position_progress(board)
 
-        self.display_position_progress(board, end="\n\n") # Needed if we don't want the line to be blank in case it finished too fast
-
-        # get full PV's in an array
-        pvs = self.get_all_pvs(board, depth) # We extract all PVs available
-        # add them to dict
-        self.fen_results[hash_fen(board.fen())] = pvs
+        # Get pvs
+        pvs = None
+        if self.cache != None and self.cache.fen_found(hf): # found in cache
+            pvs = self.cache.fetch_pvs(hf)
+            self.fen_results[hf] = pvs
+            self.display_cached_progress(board)
+        else:
+            pvs = self.get_all_pvs(board, depth) # We extract all PVs available
+            self.fen_results[hf] = pvs
+            self.display_position_progress(board, end="\n\n") # Needed if we don't want the line to be blank in case it finished too fast
+        
+        # add them to cache if set
+        if self.cache != None and self.nodes != None:
+            await self.cache.save_fen(board.fen(), self.nodes, pvs)
 
         for (pv, score) in pvs: # explore new moves
             new_board = copy.deepcopy(board) # We copy the current board
@@ -115,7 +138,7 @@ class Explorator(object):
 
             new_board.push(mo)
             if not new_board.is_game_over(claim_draw=True) and not self.above_threshold(score): # If the game isn't drawn or won by a player we continue
-                self._explore_rec(new_board, depth-1)
+                await self._explore_rec(new_board, depth-1)
             else:
                 self.tot -= worst_case_treenodes(self.pv, depth-1) # We need to update its value because less nodes need to be explored
     
@@ -183,13 +206,15 @@ class Explorator(object):
                 prct = 1.00
 
             self.out.write("\r" + " "*40) # cleaning line
-            self.out.write("\r>> {:.0%} @ {:s}nodes/s : {:s} ({:s}){:s}".format(prct, format_nodes(int(self.info_handler.info["nps"])), chess.Board.san(current_board, self.info_handler.info["pv"][1][0]), self.get_pv_score(current_board, 1), end))
+            self.out.write("\r>> {:.0%} @ {:s}nodes/s : {:s} ({:s}){:s}".format(prct, format_nodes(int(self.info_handler.info["nps"])), current_board.san(self.info_handler.info["pv"][1][0]), self.get_pv_score(current_board, 1), end))
             self.out.flush()
 
     def display_cached_progress(self, current_board):
         """Display progress made from cached position. Fast. Suppose board IS in dictionnary"""
         self.out.write("\r" + " "*40) # cleaning line
-        self.out.write("\r>> {:.0%} @ {:s}nodes/s : {:s} ({:s})\n\n".format(1., ".Inf", chess.Board.san(current_board, self.get_pv_cached(current_board, 0)[0]), self.get_pv_score_cached(current_board, 0)))
+        deb = self.get_pv_cached(current_board, 0)
+        hf = hash_fen(current_board.fen())
+        self.out.write("\r>> {:.0%} @ {:s}nodes/s : {:s} ({:s})\n\n".format(1., ".Inf", current_board.san(self.get_pv_cached(current_board, 0)[0]), self.get_pv_score_cached(current_board, 0)))
         self.out.flush()
 
     def get_pv_score(self, board, i):

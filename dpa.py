@@ -19,13 +19,14 @@ from files import * # Imports all files and PGN related functions
 from misc import * # Imports wide variety of usefull functions
 from core import * # Imports Explorer class and core functions
 from uci import * # Needed to communicate with the engine
+from cache import *
 
 
 ###########################################
 ############### Entry point ###############
 ###########################################
 
-def main():
+async def main():
     # args parsing
     args = get_args()
 
@@ -39,6 +40,13 @@ def main():
     opt = load_options(engine, args.engine_config)
     opt["MultiPV"] = args.pv
     engine.setoption(opt)
+    t = hash_opt(opt)
+
+    # cache setup
+    cache = None
+    if args.use_cache:
+        cache = Cache()
+        await cache.load(20, ".cached.db", engine, opt)
 
     for filename in args.fen_files:
         fens = fens_from_file(filename)
@@ -52,7 +60,7 @@ def main():
             
             # Explore current fen
             exp = Explorator()
-            tree = exp.explore(board, engine, args.pv, args.depth, args.nodes, msec, args.threshold, args.appending)
+            tree = await exp.explore(board, engine, cache, args.pv, args.depth, args.nodes, msec, args.threshold, args.appending)
 
             # finished : show message
             elapsed = time.perf_counter() - time_st # in seconds
@@ -82,8 +90,10 @@ def main():
 
             else: #export raw tree
                 export_raw_tree(tree, output_filename)
+
+    cache._wait()
                 
 try:
-    main()
+    asyncio.run(main())
 except KeyboardInterrupt:
     print("\nExiting...")

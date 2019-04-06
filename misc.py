@@ -2,6 +2,7 @@ import re
 import time
 import chess
 import hashlib
+import pickle
 
 ###########################################
 ############ Helper functions #############
@@ -70,3 +71,24 @@ def hash_fen(fen_str):
     h = hashlib.md5()
     h.update(fen_str.encode("ascii")) #feed the fen to hash function
     return int.from_bytes(h.digest(), byteorder='little', signed=False) # Returns a big number
+
+
+def hash_opt(options):
+    ret = sorted(options) # We need to order them
+
+    h = hashlib.md5()
+
+    for k in ret:
+        h.update(pickle.dumps(k))
+        h.update(pickle.dumps(options[k]))
+
+    return pickle.dumps(int.from_bytes(h.digest(), byteorder='little', signed=False), protocol=pickle.HIGHEST_PROTOCOL)
+
+def remove_multiPV(opt):
+    """delete MultiPV from the options"""
+    del opt["MultiPV"]
+    return opt
+
+def blobify(obj):
+    """To BLOB."""
+    return pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
