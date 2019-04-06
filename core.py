@@ -170,21 +170,21 @@ class Explorator(object):
 
     def display_position_progress(self, current_board, end=""):
         """Display the progress analyzing the current position. Can take a lot of time since we need to lock a mutex."""
-        with self.info_handler: # Waiting for the handler to be locked
-            if "nodes" in self.info_handler.info and "pv" in self.info_handler.info and "nps" in self.info_handler.info and "score" in self.info_handler.info: # Make sure all values are set
+        #with self.info_handler: # Waiting for the handler to be locked
+        if "nodes" in self.info_handler.info and "pv" in self.info_handler.info and "nps" in self.info_handler.info and "score" in self.info_handler.info: # Make sure all values are set
                 
-                prct = 0
-                if self.nodes != None: #we use nodes as stop
-                    prct = int(self.info_handler.info["nodes"])/self.nodes
-                else: # we use time as stop
-                    prct = int(self.info_handler.info["time"])/self.msec
+            prct = 0
+            if self.nodes != None: #we use nodes as stop
+                prct = int(self.info_handler.info["nodes"])/self.nodes
+            else: # we use time as stop
+                prct = int(self.info_handler.info["time"])/self.msec
 
-                if prct >= 1.00: # we can't exceed 100% !
-                    prct = 1.00
+            if prct >= 1.00: # we can't exceed 100% !
+                prct = 1.00
 
-                self.out.write("\r" + " "*40) # cleaning line
-                self.out.write("\r>> {:.0%} @ {:s}nodes/s : {:s} ({:s}){:s}".format(prct, format_nodes(int(self.info_handler.info["nps"])), chess.Board.san(current_board, self.info_handler.info["pv"][1][0]), self.get_pv_score(current_board, 1), end))
-                self.out.flush()
+            self.out.write("\r" + " "*40) # cleaning line
+            self.out.write("\r>> {:.0%} @ {:s}nodes/s : {:s} ({:s}){:s}".format(prct, format_nodes(int(self.info_handler.info["nps"])), chess.Board.san(current_board, self.info_handler.info["pv"][1][0]), self.get_pv_score(current_board, 1), end))
+            self.out.flush()
 
     def display_cached_progress(self, current_board):
         """Display progress made from cached position. Fast. Suppose board IS in dictionnary"""

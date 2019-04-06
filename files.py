@@ -90,14 +90,17 @@ def export_raw_tree(tree, filename): # Warning : Ugly, need to be improved
 
 def append_variations(tree, node, depth):
     """Append all variation from tree (dict) in pgn"""
-    if depth == 0:
-        return
+    def _append_variations(node, depth): # Avoid dict copy
+        if depth == 0:
+            return
     
-    start_fen = node.board().fen() # fen to start with
-    h = hash_fen(start_fen)
-    if h in tree:
-        pvs = tree[hash_fen(start_fen)] # we get all pvs from this fen
-        for pv in pvs:
-            moves, score = pv
-            child = node.add_variation(moves[0], comment=score)
-            append_variations(tree, child, depth-1)
+        start_fen = node.board().fen() # fen to start with
+        h = hash_fen(start_fen)
+        if h in tree:
+            pvs = tree[hash_fen(start_fen)] # we get all pvs from this fen
+            for pv in pvs:
+                moves, score = pv
+                child = node.add_variation(moves[0], comment=score)
+                _append_variations(child, depth-1)
+
+    _append_variations(node, depth)
