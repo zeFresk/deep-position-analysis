@@ -4,6 +4,7 @@ import copy
 
 from misc import *
 from uci import *
+from multipv import *
 
 ###########################################
 ####### Core functions & exploration ######
@@ -57,7 +58,7 @@ class Explorator(object):
         ##################
         # Here are all the variables commons to all recursions
         self.crashed_once = False # Needed to not print too much errors in case of a crash
-        self.tot = worst_case_treenodes(pv, depth) # total number of nodes in the final tree, worst case scenario.
+        self.tot = pv.max_nodes_from(board, depth) # total number of nodes in the final tree, worst case scenario.
 
         self.time_st = time.perf_counter() # We initialize starting time
 
@@ -81,80 +82,80 @@ class Explorator(object):
 
     async def _explore_rec(self, board, depth): # less parameters so less copy
         """Main recursive function."""
-        try:
-            if depth == 0:
-                return None
+        #try:
+        if depth == 0:
+            return None
 
-            self.pos_index += 1
+        self.pos_index += 1
 
-            hf = hash_fen(board.fen())
+        hf = hash_fen(board.fen())
 
-            # Check if position has already been encountered
-            if hf in self.fen_results:
-                self.display_global_progress()
-                self.display_cached_progress(board)
-                self.tot -= worst_case_treenodes(self.pv, depth-1) # We need to update its value because less nodes need to be explored
-                return None #terminal node
-
-            # Start search in cache
-            if self.cache != None and self.nodes != None:
-                await self.cache.search_fen(self.nodes, hf, self.get_multiPV(board, depth))
-
-            # Setting-up position for engine
-            self.engine.position(board)
-            # Start search
-            cmd = self.engine.go(nodes=self.nodes, movetime=self.msec, async_callback=True)
+        # Check if position has already been encountered
+        if hf in self.fen_results:
             self.display_global_progress()
+            self.display_cached_progress(board)
+            self.tot -= self.pv.max_nodes_from(board, depth) # We need to update its value because less nodes need to be explored
+            return None #terminal node
 
-            while not cmd.done(): # until search is finished
-                if self.cache != None and self.cache.fen_found(hf): # found in cache
-                    self.engine.stop()
-                    break
+        # Start search in cache
+        if self.cache != None and self.nodes != None:
+            await self.cache.search_fen(self.nodes, hf, self.pv.get_pvs_from(board, depth))
 
-                time.sleep(0.00001) # Sleep for 10 µs to not use full core
-                self.display_position_progress(board)
+        # Setting-up position for engine
+        self.engine.position(board)
+        # Start search
+        cmd = self.engine.go(nodes=self.nodes, movetime=self.msec, async_callback=True)
+        self.display_global_progress()
 
-            # Get pvs
-            pvs = None
+        while not cmd.done(): # until search is finished
             if self.cache != None and self.cache.fen_found(hf): # found in cache
-                pvs = self.cache.fetch_pvs(hf)
-                self.fen_results[hf] = keep_firstn(pvs, self.get_multiPV(board, depth)) # Delete uneeded pvs
-                self.display_cached_progress(board)
+                self.engine.stop()
+                break
+
+            time.sleep(0.00001) # Sleep for 10 µs to not use full core
+            self.display_position_progress(board)
+
+        # Get pvs
+        pvs = None
+        if self.cache != None and self.cache.fen_found(hf): # found in cache
+            pvs = self.cache.fetch_pvs(hf)
+            self.fen_results[hf] = keep_firstn(pvs, self.pv.get_pvs_from(board, depth)) # Delete uneeded pvs
+            self.display_cached_progress(board)
+        else:
+            pvs = self.get_all_pvs(board, depth) # We extract all PVs available
+            self.fen_results[hf] = keep_firstn(pvs, self.pv.get_pvs_from(board, depth)) # Delete uneeded pvs
+            self.display_position_progress(board, end="\n\n") # Needed if we don't want the line to be blank in case it finished too fast
+
+        # add them to cache if set
+        if self.cache != None and self.nodes != None:
+            await self.cache.save_fen(board.fen(), self.nodes, self.pv.max_pv(), pvs)
+
+        for (pv, score) in self.fen_results[hf]: # explore new moves
+            new_board = copy.deepcopy(board) # We copy the current board
+            mo = pv[0] # First move in PV
+
+            if not new_board.is_legal(mo): # If the next move is illegal (it can happen with Leela)
+                raise RuntimeError("Illegal move : {:s} in {:s}\n".format(new_board.san(mo), new_board.fen())) # We throw an exception
+
+            new_board.push(mo)
+            if not new_board.is_game_over(claim_draw=True) and not self.above_threshold(score): # If the game isn't drawn or won by a player we continue
+                await self._explore_rec(new_board, depth-1)
             else:
-                pvs = self.get_all_pvs(board, depth) # We extract all PVs available
-                self.fen_results[hf] = keep_firstn(pvs, self.get_multiPV(board, depth)) # Delete uneeded pvs
-                self.display_position_progress(board, end="\n\n") # Needed if we don't want the line to be blank in case it finished too fast
-
-            # add them to cache if set
-            if self.cache != None and self.nodes != None:
-                await self.cache.save_fen(board.fen(), self.nodes, self.get_multiPV(board, depth), pvs)
-
-            for (pv, score) in pvs: # explore new moves
-                new_board = copy.deepcopy(board) # We copy the current board
-                mo = pv[0] # First move in PV
-
-                if not new_board.is_legal(mo): # If the next move is illegal (it can happen with Leela)
-                    raise RuntimeError("Illegal move : {:s} in {:s}\n".format(new_board.san(mo), new_board.fen())) # We throw an exception
-
-                new_board.push(mo)
-                if not new_board.is_game_over(claim_draw=True) and not self.above_threshold(score): # If the game isn't drawn or won by a player we continue
-                    await self._explore_rec(new_board, depth-1)
-                else:
-                    self.tot -= worst_case_treenodes(self.pv, depth-1) # We need to update its value because less nodes need to be explored
+                self.tot -= self.pv.max_nodes_from(board, depth) # We need to update its value because less nodes need to be explored
     
-            return self.fen_results
+        return self.fen_results
 
-        except KeyboardInterrupt as e:
-            raise e
-        except SystemExit as e:
-            raise e
-        except :
-            if not self.crashed_once: # We only print the bug message if we are in the first recursive call
-                print("\nCongratulations, you found a bug ! A bug report is generated in bug.log\nPlease help me correct it by linking the report to your message :)\n")
-                self.crashed_once = True
-                self.log_bug("bug.log", board, depth, sys.exc_info())
+        #except KeyboardInterrupt as e:
+        #    raise e
+        #except SystemExit as e:
+        #    raise e
+        #except :
+        #    if not self.crashed_once: # We only print the bug message if we are in the first recursive call
+        #        print("\nCongratulations, you found a bug ! A bug report is generated in bug.log\nPlease help me correct it by linking the report to your message :)\n")
+        #        self.crashed_once = True
+        #        self.log_bug("bug.log", board, depth, sys.exc_info())
 
-            raise
+        #    raise
 
     def log_bug(self, filename, board, depth, exc_tuple):
         """Log an exception which occured in a given board to a file."""
@@ -175,8 +176,8 @@ class Explorator(object):
         """Returns all the first moves computed and update total number of nodes to explore if needed."""
         ret = []
         with self.info_handler: # We need to lock the handler
-            if self.info_handler.info["multipv"] < self.pv: #less pv generated than requested, whatever the reason
-                self.tot -= worst_case_treenodes(self.pv, depth-1)*(self.pv - self.info_handler.info["multipv"]) # We need to update its value because less nodes need to be explored
+            if self.info_handler.info["multipv"] < self.pv.get_pvs_from(board,depth): #less pv generated than requested, whatever the reason
+                self.tot -= self.pv.max_nodes_from(board, depth-1)*(self.pv.get_pvs_from(board,depth) - self.info_handler.info["multipv"]) # We need to update its value because less nodes need to be explored
             for i in range(1, self.info_handler.info["multipv"]+1):
                 ret += [[self.info_handler.info["pv"][i], self.get_pv_score(board, i)]]
         
@@ -228,6 +229,3 @@ class Explorator(object):
     def get_pv_score_cached(self, board, i):
         """Returns score associated to i-th PV formatted as a string."""
         return self.fen_results[hash_fen(board.fen())][i][1]
-
-    def get_multiPV(self, board, depth):
-        return self.pv

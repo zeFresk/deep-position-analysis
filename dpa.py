@@ -38,7 +38,7 @@ async def main():
     engine.uci()
    
     opt = load_options(engine, args.engine_config)
-    opt["MultiPV"] = args.pv
+    opt["MultiPV"] = args.pv.max_pv()
     engine.setoption(opt)
     t = hash_opt(opt)
 
@@ -93,7 +93,17 @@ async def main():
 
     cache._wait()
                 
-try:
-    asyncio.run(main())
-except:
-    print("\nExiting...")
+#try:
+asyncio.run(main())
+#except:
+#    print("\nExiting...")
+
+#from dynpv import *
+#p = MultiPV("3",3)
+#print(p.max_nodes(chess.WHITE, 3)) # 13
+
+#p = MultiPV("3-1/1p",4)
+#print(p.max_nodes(chess.WHITE, 3)) # 
+
+#p = MultiPV("3W1B",24)
+#print(p.max_nodes(chess.WHITE, 3)) # 7 Need to figure why it doesn't work...
