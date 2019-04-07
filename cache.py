@@ -4,6 +4,7 @@ import os
 import asyncio
 import time
 import pickle
+from concurrent.futures import ThreadPoolExecutor
 
 from misc import *
 
@@ -13,7 +14,6 @@ async def safe_cancel(task):
     if not (task.done() or task.cancelled()):
         try:
             task.cancel()
-            await task
         except asyncio.CancelledError:
             pass
 
@@ -42,6 +42,7 @@ class Cache:
         """Close DBs."""
         self.writer.close()
         self.reader.close()
+        self.pool.shutdown()
 
     async def load(self, mio, filename, engine, engine_options):
         """Initialize cache. Real constructor.
@@ -66,7 +67,7 @@ class Cache:
         self.writing = False
         self.ready = True
         self.reading_task = None
-        self.writing_task = None
+        self.writing_tasks = None
 
         # Needed for search in cache
         self.found = None
@@ -97,26 +98,33 @@ class Cache:
     ##########
     # Reading functions
     ##########
-    async def search_fen(self, nodes, hash_fen):
+    async def search_fen(self, nodes, fen_hash, multipv):
         """Start searching for the hash inside local cache. Asynchronous."""
         if nodes == None:
             return
+
         async def _search_fen():
             self._wait_ready()
             req = self.reader.execute(
-                '''SELECT data FROM pvs WHERE
-                (search_id IN (SELECT search_id FROM search WHERE uci_id=? AND nodes <= ?))
-                AND fen_hash=?''', (self.get_uci_pk(), nodes, blobify(hash_fen)))
+                '''SELECT pvs_data FROM (SELECT fen_hash, pvs_data, nodes from 
+                        pvs natural join uci_search
+                        group by search_id, fen_hash
+                        having uci_id=?
+                        and nodes >= ?
+                        and fen_hash=?
+                        and multipv >= ?)
+                    GROUP BY fen_hash having nodes=MAX(nodes)
+                    ''', (self.get_uci_pk(), nodes, blobify(fen_hash), multipv))
 
             r = req.fetchone()
             if r != None: # We found datas !!
-                self.fetch[hash_fen] = pickle.loads(r['data'])
+                self.fetch[fen_hash] = pickle.loads(r['pvs_data'])[:multipv] # Keep only as much pvs as needed
             ##########
 
         if self.reading_task != None: # We found before search finished
             await safe_cancel(self.reading_task)
 
-        self.reading_task = asyncio.create_task(_search_fen())
+        self.reading_task = await asyncio.create_task(_search_fen())
         
 
     def fen_found(self, hash_fen):
@@ -143,7 +151,7 @@ class Cache:
         self.ready = False
 
         # drop tables
-        for tb_name in ["key", "pair", "config", "appair", "engine", "uci_engine", "search", "fen", "pv"]:
+        for tb_name in ["key", "pair", "config", "appair", "engine", "uci_engine", "uci_search", "fen", "pv"]:
             self.writer.execute('''DROP TABLE IF EXISTS {:s}'''.format(tb_name))
 
         # Tables creation
@@ -181,10 +189,11 @@ class Cache:
             FOREIGN KEY(eng_id) REFERENCES engine(eng_id),
             FOREIGN KEY(conf_id) REFERENCES config(conf_id) )''')
         self.writer.execute(
-            '''CREATE TABLE search (
+            '''CREATE TABLE uci_search (
             search_id INTEGER PRIMARY KEY,
             uci_id,
             nodes INTEGER,
+            multipv INTEGER,
             FOREIGN KEY(uci_id) REFERENCES uci_engine(uci_id),
             CONSTRAINT CK_nodes CHECK (nodes > 0),
             CONSTRAINT UC_search UNIQUE (uci_id, nodes) )''')
@@ -197,9 +206,9 @@ class Cache:
             pv_id INTEGER PRIMARY KEY,
             fen_hash BLOB,
             search_id INTEGER,
-            data BLOB,
+            pvs_data BLOB,
             FOREIGN KEY(fen_hash) REFERENCES fen(fen_hash),
-            FOREIGN KEY(search_id) REFERENCES search(search_id)
+            FOREIGN KEY(search_id) REFERENCES uci_search(search_id)
             CONSTRAINT UC_pvs UNIQUE (fen_hash, search_id) )''')
         
         self.writer.execute("COMMIT")
@@ -209,7 +218,7 @@ class Cache:
         self._unlock()
 
 
-    async def save_fen(self, fen, nodes, pvs):
+    async def save_fen(self, fen, nodes, multipv, pvs):
         """Save pvs in local cache. Asynchronous."""
         async def _write_fen():
             self._wait()
@@ -226,20 +235,21 @@ class Cache:
 
             # Add search params
             self.writer.execute(
-                '''INSERT OR IGNORE INTO search(uci_id, nodes)
-                VALUES (?,?)''', (self.get_uci_pk(), nodes))
+                '''INSERT OR IGNORE INTO uci_search(uci_id, nodes, multipv)
+                VALUES (?,?,?)''', (self.get_uci_pk(), nodes, multipv))
             self.writer.commit()
             search_id = self.reader.execute(
-                '''SELECT search_id FROM search
-                WHERE uci_id=? AND nodes=?''', (self.get_uci_pk(), nodes)).fetchone()['search_id']
+                '''SELECT search_id FROM uci_search
+                WHERE uci_id=? AND nodes=? AND multipv=?''', (self.get_uci_pk(), nodes, multipv)).fetchone()['search_id']
 
             # Insert pvs
             self.writer.execute('''
-            INSERT OR IGNORE INTO pvs(fen_hash, search_id, data)
+            INSERT OR IGNORE INTO pvs(fen_hash, search_id, pvs_data)
             VALUES (?,?,?)''', (hf_blob, search_id, pickle.dumps(pvs, protocol=pickle.HIGHEST_PROTOCOL)))
             self._unlock()
 
-        self.writing_task = asyncio.create_task(_write_fen())
+        if not (hash_fen(fen) in self.fetch):
+            self.writing_task = asyncio.create_task(_write_fen())
 
     async def register_engine(self):
         """Register engine and its config in the cache. Asynchronous"""

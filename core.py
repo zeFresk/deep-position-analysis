@@ -98,7 +98,7 @@ class Explorator(object):
 
         # Start search in cache
         if self.cache != None and self.nodes != None:
-            await self.cache.search_fen(self.nodes, hf)
+            await self.cache.search_fen(self.nodes, hf, self.get_multiPV(board, depth))
 
         # Setting-up position for engine
         self.engine.position(board)
@@ -118,16 +118,16 @@ class Explorator(object):
         pvs = None
         if self.cache != None and self.cache.fen_found(hf): # found in cache
             pvs = self.cache.fetch_pvs(hf)
-            self.fen_results[hf] = pvs
+            self.fen_results[hf] = keep_firstn(pvs, self.get_multiPV(board, depth)) # Delete uneeded pvs
             self.display_cached_progress(board)
         else:
             pvs = self.get_all_pvs(board, depth) # We extract all PVs available
-            self.fen_results[hf] = pvs
+            self.fen_results[hf] = keep_firstn(pvs, self.get_multiPV(board, depth)) # Delete uneeded pvs
             self.display_position_progress(board, end="\n\n") # Needed if we don't want the line to be blank in case it finished too fast
-        
+
         # add them to cache if set
         if self.cache != None and self.nodes != None:
-            await self.cache.save_fen(board.fen(), self.nodes, pvs)
+            await self.cache.save_fen(board.fen(), self.nodes, self.get_multiPV(board, depth), pvs)
 
         for (pv, score) in pvs: # explore new moves
             new_board = copy.deepcopy(board) # We copy the current board
@@ -228,3 +228,6 @@ class Explorator(object):
     def get_pv_score_cached(self, board, i):
         """Returns score associated to i-th PV formatted as a string."""
         return self.fen_results[hash_fen(board.fen())][i][1]
+
+    def get_multiPV(self, board, depth):
+        return self.pv

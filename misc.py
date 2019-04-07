@@ -92,3 +92,10 @@ def remove_multiPV(opt):
 def blobify(obj):
     """To BLOB."""
     return pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
+
+def keep_firstn(lst, n):
+    """Keep only the first n elems in a list."""
+    if len(lst) <= n:
+        return lst
+    else:
+        return lst[:n]
