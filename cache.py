@@ -42,7 +42,7 @@ class Cache:
         """Close DBs."""
         self.writer.close()
         self.reader.close()
-        self.pool.shutdown()
+        #self.pool.shutdown()
 
     async def load(self, mio, filename, engine, engine_options):
         """Initialize cache. Real constructor.

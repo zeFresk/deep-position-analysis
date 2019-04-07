@@ -95,5 +95,5 @@ async def main():
                 
 try:
     asyncio.run(main())
-except KeyboardInterrupt:
+except:
     print("\nExiting...")

@@ -81,80 +81,80 @@ class Explorator(object):
 
     async def _explore_rec(self, board, depth): # less parameters so less copy
         """Main recursive function."""
-        #try:
-        if depth == 0:
-            return None
+        try:
+            if depth == 0:
+                return None
 
-        self.pos_index += 1
+            self.pos_index += 1
 
-        hf = hash_fen(board.fen())
+            hf = hash_fen(board.fen())
 
-        # Check if position has already been encountered
-        if hf in self.fen_results:
-            self.display_global_progress()
-            self.display_cached_progress(board)
-            self.tot -= worst_case_treenodes(self.pv, depth-1) # We need to update its value because less nodes need to be explored
-            return None #terminal node
-
-        # Start search in cache
-        if self.cache != None and self.nodes != None:
-            await self.cache.search_fen(self.nodes, hf, self.get_multiPV(board, depth))
-
-        # Setting-up position for engine
-        self.engine.position(board)
-        # Start search
-        cmd = self.engine.go(nodes=self.nodes, movetime=self.msec, async_callback=True)
-        self.display_global_progress()
-
-        while not cmd.done(): # until search is finished
-            if self.cache != None and self.cache.fen_found(hf): # found in cache
-                self.engine.stop()
-                break
-
-            time.sleep(0.00001) # Sleep for 10 µs to not use full core
-            self.display_position_progress(board)
-
-        # Get pvs
-        pvs = None
-        if self.cache != None and self.cache.fen_found(hf): # found in cache
-            pvs = self.cache.fetch_pvs(hf)
-            self.fen_results[hf] = keep_firstn(pvs, self.get_multiPV(board, depth)) # Delete uneeded pvs
-            self.display_cached_progress(board)
-        else:
-            pvs = self.get_all_pvs(board, depth) # We extract all PVs available
-            self.fen_results[hf] = keep_firstn(pvs, self.get_multiPV(board, depth)) # Delete uneeded pvs
-            self.display_position_progress(board, end="\n\n") # Needed if we don't want the line to be blank in case it finished too fast
-
-        # add them to cache if set
-        if self.cache != None and self.nodes != None:
-            await self.cache.save_fen(board.fen(), self.nodes, self.get_multiPV(board, depth), pvs)
-
-        for (pv, score) in pvs: # explore new moves
-            new_board = copy.deepcopy(board) # We copy the current board
-            mo = pv[0] # First move in PV
-
-            if not new_board.is_legal(mo): # If the next move is illegal (it can happen with Leela)
-                raise RuntimeError("Illegal move : {:s} in {:s}\n".format(new_board.san(mo), new_board.fen())) # We throw an exception
-
-            new_board.push(mo)
-            if not new_board.is_game_over(claim_draw=True) and not self.above_threshold(score): # If the game isn't drawn or won by a player we continue
-                await self._explore_rec(new_board, depth-1)
-            else:
+            # Check if position has already been encountered
+            if hf in self.fen_results:
+                self.display_global_progress()
+                self.display_cached_progress(board)
                 self.tot -= worst_case_treenodes(self.pv, depth-1) # We need to update its value because less nodes need to be explored
+                return None #terminal node
+
+            # Start search in cache
+            if self.cache != None and self.nodes != None:
+                await self.cache.search_fen(self.nodes, hf, self.get_multiPV(board, depth))
+
+            # Setting-up position for engine
+            self.engine.position(board)
+            # Start search
+            cmd = self.engine.go(nodes=self.nodes, movetime=self.msec, async_callback=True)
+            self.display_global_progress()
+
+            while not cmd.done(): # until search is finished
+                if self.cache != None and self.cache.fen_found(hf): # found in cache
+                    self.engine.stop()
+                    break
+
+                time.sleep(0.00001) # Sleep for 10 µs to not use full core
+                self.display_position_progress(board)
+
+            # Get pvs
+            pvs = None
+            if self.cache != None and self.cache.fen_found(hf): # found in cache
+                pvs = self.cache.fetch_pvs(hf)
+                self.fen_results[hf] = keep_firstn(pvs, self.get_multiPV(board, depth)) # Delete uneeded pvs
+                self.display_cached_progress(board)
+            else:
+                pvs = self.get_all_pvs(board, depth) # We extract all PVs available
+                self.fen_results[hf] = keep_firstn(pvs, self.get_multiPV(board, depth)) # Delete uneeded pvs
+                self.display_position_progress(board, end="\n\n") # Needed if we don't want the line to be blank in case it finished too fast
+
+            # add them to cache if set
+            if self.cache != None and self.nodes != None:
+                await self.cache.save_fen(board.fen(), self.nodes, self.get_multiPV(board, depth), pvs)
+
+            for (pv, score) in pvs: # explore new moves
+                new_board = copy.deepcopy(board) # We copy the current board
+                mo = pv[0] # First move in PV
+
+                if not new_board.is_legal(mo): # If the next move is illegal (it can happen with Leela)
+                    raise RuntimeError("Illegal move : {:s} in {:s}\n".format(new_board.san(mo), new_board.fen())) # We throw an exception
+
+                new_board.push(mo)
+                if not new_board.is_game_over(claim_draw=True) and not self.above_threshold(score): # If the game isn't drawn or won by a player we continue
+                    await self._explore_rec(new_board, depth-1)
+                else:
+                    self.tot -= worst_case_treenodes(self.pv, depth-1) # We need to update its value because less nodes need to be explored
     
-        return self.fen_results
+            return self.fen_results
 
-        #except KeyboardInterrupt as e:
-        #    raise e
-        #except SystemExit as e:
-        #    sys.exit(e)
-        #except :
-        #    if not self.crashed_once: # We only print the bug message if we are in the first recursive call
-        #        print("\nCongratulations, you found a bug ! A bug report is generated in bug.log\nPlease help me correct it by linking the report to your message :)\n")
-        #        self.crashed_once = True
+        except KeyboardInterrupt as e:
+            raise e
+        except SystemExit as e:
+            raise e
+        except :
+            if not self.crashed_once: # We only print the bug message if we are in the first recursive call
+                print("\nCongratulations, you found a bug ! A bug report is generated in bug.log\nPlease help me correct it by linking the report to your message :)\n")
+                self.crashed_once = True
+                self.log_bug("bug.log", board, depth, sys.exc_info())
 
-        #    self.log_bug("bug.log", board, depth, sys.exc_info())
-        #    sys.exit(-3) # to unstack
+            raise
 
     def log_bug(self, filename, board, depth, exc_tuple):
         """Log an exception which occured in a given board to a file."""
