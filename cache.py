@@ -23,20 +23,20 @@ async def safe_cancel(task):
 
 class Cache(object):
     """Core class that will search and write in cache asynchronously."""
-    def __init__(self):
-        """False constructor needed because it can't be asyn."""
-        self.engine = None
-        self.uci_pk = None
-        self.writing = None
-        self.ready = None
-        self.reading_task = None
-        self.writing_task = None
-        self.found = None
-        self.fetch = None
-        self.writer = None
-        self.reader = None
-        self.engine_options = None
-        self.filename = None
+    #def __init__(self):
+    #    """False constructor needed because it can't be async."""
+    #    self.engine = None
+    #    self.uci_pk = None
+    #    self.writing = None
+    #    self.ready = None
+    #    self.reading_task = None
+    #    self.writing_task = None
+    #    self.found = None
+    #    self.fetch = None
+    #    self.writer = None
+    #    self.reader = None
+    #    self.engine_options = None
+    #    self.filename = None
         
     def close(self):
         if self.writer is not None and self.reader is not None:
@@ -52,7 +52,7 @@ class Cache(object):
         self.close()
         
 
-    async def load(self, mio, filename, engine, engine_options):
+    def __init__(self, mio, filename, engine, engine_options):
         """Initialize cache. Real constructor.
             - mio : cache size in Mio
             - filename : filename of the cachefile
@@ -95,13 +95,14 @@ class Cache(object):
         self.reader.execute("PRAGMA cache_size=-{:d}".format(kio))
 
         # Force one reader only
-        self.writer.execute("begin exclusive")
+        #self.writer.execute("begin exclusive")
+        #self.writer("COMMIT")
 
         if init_needed:
-            await self.reset()
+            self.reset()
 
         # Add engine to cache
-        await self.register_engine()
+        self.register_engine()
 
     ##########
     # Reading functions
@@ -152,7 +153,7 @@ class Cache(object):
     ##########
     # Writing functions
     ##########
-    async def reset(self):
+    def reset(self):
         """Drop and reset all tables. Asynchronous"""
         self._wait() # Wait for writing
         self._lock()
@@ -245,7 +246,6 @@ class Cache(object):
             self.writer.execute(
                 '''INSERT OR IGNORE INTO uci_search(uci_id, nodes, multipv)
                 VALUES (?,?,?)''', (self.get_uci_pk(), nodes, multipv))
-            self.writer.commit()
             search_id = self.reader.execute(
                 '''SELECT search_id FROM uci_search
                 WHERE uci_id=? AND nodes=? AND multipv=?''', (self.get_uci_pk(), nodes, multipv)).fetchone()['search_id']
@@ -259,7 +259,7 @@ class Cache(object):
         if not (hash_fen(fen) in self.fetch):
             self.writing_task = asyncio.create_task(_write_fen())
 
-    async def register_engine(self):
+    def register_engine(self):
         """Register engine and its config in the cache. Asynchronous"""
         if self.get_uci_pk() == None: # uci_engine doesn't exists yet
             self._wait()
