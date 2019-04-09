@@ -21,7 +21,7 @@ async def safe_cancel(task):
 ############## Local cache ################
 ###########################################
 
-class Cache:
+class Cache(object):
     """Core class that will search and write in cache asynchronously."""
     def __init__(self):
         """False constructor needed because it can't be asyn."""
@@ -37,12 +37,20 @@ class Cache:
         self.reader = None
         self.engine_options = None
         self.filename = None
-
-    def __del__(self):
-        """Close DBs."""
-        self.writer.close()
-        self.reader.close()
+        
+    def close(self):
+        if self.writer is not None and self.reader is not None:
+                self._wait()
+                self.writer.close()
+                self.reader.close()
         #self.pool.shutdown()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self,ext_type,exc_value,traceback):
+        self.close()
+        
 
     async def load(self, mio, filename, engine, engine_options):
         """Initialize cache. Real constructor.

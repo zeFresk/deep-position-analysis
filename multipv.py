@@ -142,6 +142,7 @@ class MultiPV(object):
         Initialize multiPV given a multiPV expression (see above) 
         and the maximum_depth possible.
         """
+        self.str = pv_exp # ? Maybe simplify it to minimum in the future ?
         self.base_array = parse_pv_exp(pv_exp)
         self.max_depth = max_depth
         self.__cached = self.__Cached(self.base_array, self.max_depth) # Create cache
@@ -172,3 +173,7 @@ class MultiPV(object):
     def max_pv(self):
         """Returns biggest Multi-PV needed."""
         return self.__cached.max_pv
+
+    def to_str(self):
+        """Converts this to a PV expression."""
+        return self.str

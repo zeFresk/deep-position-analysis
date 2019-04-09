@@ -28,6 +28,7 @@ class Explorator(object):
         self.time_st = None
         self.info_handler = None
         self.pos_index = None
+        self.cached_found = None
         self.out = None
         self.fen_results = None
 
@@ -66,6 +67,7 @@ class Explorator(object):
         self.engine.info_handlers.append(self.info_handler) 
 
         self.pos_index = 0 # Number of variations already explored
+        self.cached_found = 0 # Number of positions found in cache (needed to get accurate time estimates)
 
         self.fen_results = dict() # (hash_128) -> [(PV,score),...,(PVN,scoreN)]
 
@@ -86,15 +88,15 @@ class Explorator(object):
         if depth == 0:
             return None
 
-        self.pos_index += 1
-
         hf = hash_fen(board.fen())
 
         # Check if position has already been encountered
         if hf in self.fen_results:
+            self.cached_found += 1
             self.display_global_progress()
             self.display_cached_progress(board)
-            self.tot -= self.pv.max_nodes_from(board, depth) # We need to update its value because less nodes need to be explored
+            self.delete_subnodes(board, depth) # We need to update its value because less nodes need to be explored
+            self.pos_index += 1
             return None #terminal node
 
         # Start search in cache
@@ -118,6 +120,7 @@ class Explorator(object):
         # Get pvs
         pvs = None
         if self.cache != None and self.cache.fen_found(hf): # found in cache
+            self.cached_found += 1
             pvs = self.cache.fetch_pvs(hf)
             self.fen_results[hf] = keep_firstn(pvs, self.pv.get_pvs_from(board, depth)) # Delete uneeded pvs
             self.display_cached_progress(board)
@@ -130,6 +133,8 @@ class Explorator(object):
         if self.cache != None and self.nodes != None:
             await self.cache.save_fen(board.fen(), self.nodes, self.pv.max_pv(), pvs)
 
+        self.pos_index += 1
+
         for (pv, score) in self.fen_results[hf]: # explore new moves
             new_board = copy.deepcopy(board) # We copy the current board
             mo = pv[0] # First move in PV
@@ -141,7 +146,7 @@ class Explorator(object):
             if not new_board.is_game_over(claim_draw=True) and not self.above_threshold(score): # If the game isn't drawn or won by a player we continue
                 await self._explore_rec(new_board, depth-1)
             else:
-                self.tot -= self.pv.max_nodes_from(board, depth) # We need to update its value because less nodes need to be explored
+                self.delete_subnodes(board, depth) # We need to update its value because less nodes need to be explored
     
         return self.fen_results
 
@@ -165,6 +170,14 @@ class Explorator(object):
 
         fbug.write("bug in fen = [{!s}] with \"{!s}\", PV={:d} NODES={:d} DEPTH={:d}\n####\n{!s}\n\n".format(board.fen(), self.engine.name, self.pv, self.nodes, depth, exception_str))
 
+    def delete_subnodes(self, board, depth):
+        """
+        Need to be called when we will not exoplore further a variation. Whatever the reason.
+        Remove subtree size from the total to search.
+        """
+        self.tot -= self.pv.max_nodes_from(board, depth-1)
+
+
     def above_threshold(self, score):
         """Returns wether a score is above threshold or not."""
         if score[1] == "M": # This a mate score !
@@ -177,7 +190,9 @@ class Explorator(object):
         ret = []
         with self.info_handler: # We need to lock the handler
             if self.info_handler.info["multipv"] < self.pv.get_pvs_from(board,depth): #less pv generated than requested, whatever the reason
-                self.tot -= self.pv.max_nodes_from(board, depth-1)*(self.pv.get_pvs_from(board,depth) - self.info_handler.info["multipv"]) # We need to update its value because less nodes need to be explored
+                print("Hello")
+                for j in range(self.pv.get_pvs_from(board,depth) - self.info_handler.info["multipv"]): # We need to update its value because there's less nodes need to explore
+                    self.delete_subnodes(board, depth-1)
             for i in range(1, self.info_handler.info["multipv"]+1):
                 ret += [[self.info_handler.info["pv"][i], self.get_pv_score(board, i)]]
         
@@ -187,15 +202,17 @@ class Explorator(object):
         """Display the global progress in analyzing all the possible variations along with estimated time needed."""
         elapsed_time = elapsed_since(self.time_st) # Getting elapsed time from start
 
-        pos_per_s = self.pos_index/elapsed_time # average positions per second
-        remaining_time_s = (self.tot-(self.pos_index-1)) / pos_per_s
-        print(">Analysing variation %d of %d, estimated time remaining : %dh %dm..."%(self.pos_index, self.tot, remaining_time_s // (60*60), (remaining_time_s // 60) %60), flush=True)
+        calculated_pos = max(self.pos_index - self.cached_found, 0)
+        pos_per_s = calculated_pos/elapsed_time # average positions per second
+        remaining_time_seconds = int((self.tot-(self.pos_index)) / pos_per_s) if pos_per_s > 0 else 0
+        remaining_time_str = "{:d}h {:d}m".format(remaining_time_seconds // (60*60), (remaining_time_seconds // 60) %60) if remaining_time_seconds > 0 else "calculating"
+        print(">Analysing variation {:d} of {:d}, estimated time remaining : {:s}...".format(self.pos_index+1, self.tot, remaining_time_str), flush=True)
         self.out.write(">> 0% : ###")
 
     def display_position_progress(self, current_board, end=""):
         """Display the progress analyzing the current position. Can take a lot of time since we need to lock a mutex."""
         #with self.info_handler: # Waiting for the handler to be locked
-        if "nodes" in self.info_handler.info and "pv" in self.info_handler.info and "nps" in self.info_handler.info and "score" in self.info_handler.info: # Make sure all values are set
+        if "nodes" in self.info_handler.info and "pv" in self.info_handler.info and "nps" in self.info_handler.info and "score" in self.info_handler.info and 1 in self.info_handler.info["pv"]: # Make sure all values are set
                 
             prct = 0
             if self.nodes != None: #we use nodes as stop

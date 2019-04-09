@@ -1,4 +1,5 @@
 import chess.pgn
+import os.path
 
 from misc import * # is_pgn...
 
@@ -35,12 +36,13 @@ def fens_from_file(filename):
 
 def format_filename(filename, id, args):
     """Returns the output filename given input filename, index and args."""
+    filename = os.path.split(filename)[1] #extract real name
     index = filename.find(".")
     if index == -1:
         index = len(filename)
 
     stopping_fmt = (format_nodes(args.nodes,"{:1.0f}") +"n") if (args.nodes != None) else (str(args.sec)+"s")
-    return "%s%d_%s%dv%dp"%(filename[0:index], id, stopping_fmt, args.pv, args.depth)
+    return "{:s}{:d}_{:s}_{:s}v_{:d}p".format(filename[0:index], id, stopping_fmt, args.pv.to_str(), args.depth)
 
 def new_default_game(board, engine_name, args):
     """Returns a Game object with the default headers and board set."""
