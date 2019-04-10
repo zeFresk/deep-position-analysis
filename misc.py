@@ -28,10 +28,6 @@ def fmt_mate(mate_score):
     else: # mate in X for white
         return "+M{:d}".format(abs(mate_score))
 
-def worst_case_treenodes(degree, depth):
-    """Compute the total number of nodes in a tree of constant branching factor for the given depth"""
-    return ((degree**(depth))-1)/(degree-1)
-
 def elapsed_since(timestamp):
     """Returns elapsed time since a given timestamp in seconds.
     It will always returns at least one."""

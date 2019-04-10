@@ -95,7 +95,8 @@ class Explorator(object):
             self.cached_found += 1
             self.display_global_progress()
             self.display_cached_progress(board)
-            self.delete_subnodes(board, depth) # We need to update its value because less nodes need to be explored
+            if depth != 1:
+                self.delete_subnodes(board, depth) # We need to update its value because less nodes need to be explored
             self.pos_index += 1
             return None #terminal node
 

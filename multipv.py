@@ -95,32 +95,25 @@ class MultiPV(object):
                 return self.white_pvs[depth]
             else:
                 return self.black_pvs[depth]
-
-        def __recursive_gen(self,color, depth):
-            if depth == 0:
-                return 1
-            pv_i = self.__get_pvs(color, depth)
-            return 1 + pv_i * self.__recursive_gen(not color, depth-1)
         
         def generate_max_nodes(self):
-            """Generate max numbers of nodes for each depth. 
-            Need optimization if I have time to do so.
-            Still under 100ms for depth=24 so..."""
-            for i in range(len(self.white_max_nodes)):
-                self.white_max_nodes[i] = self.__recursive_gen(chess.WHITE, i)
-            for i in range(len(self.white_max_nodes)):
-                self.black_max_nodes[i] = self.__recursive_gen(chess.BLACK, i)
-            #self.white_max_nodes[0] = 1
-            #self.black_max_nodes[0] = 1
-            ## White
-            #turn = chess.WHITE
-            #for i in range(1,len(self.white_pvs)):
-            #    self.white_max_nodes[i] = self.white_max_nodes[i-1]*self.__get_pvs(turn, i) +1
-            #    turn = not turn
-            ## White
-            #turn = chess.BLACK
-            #for i in range(1,len(self.white_pvs)):
-            #    self.black_max_nodes[i] = self.black_max_nodes[i-1]*self.__get_pvs(turn, i) +1
+            """Generate max numbers of nodes for each depth."""
+            # Default values
+            self.__set_max_nodes(chess.WHITE, 0, 1)
+            self.__set_max_nodes(chess.BLACK, 0, 1)
+
+            # WHITE finishes the BLACK finishes
+            for color in (chess.WHITE, chess.BLACK):
+                for i in range(1, len(self.white_max_nodes)):
+                    self._Cached__set_max_nodes(color, i, 1+ self.get_pvs(color, i+1) * self.__max_nodes(not color, i-1))
+                    color = not color
+
+        def __set_max_nodes(self, color, i, v):
+            """Set value in corresponding array. DO NOT USE."""
+            if color == chess.WHITE:
+                self.white_max_nodes[i] = v
+            else:
+                self.black_max_nodes[i] = v
 
         def __max_nodes(self, color, depth): # No check
             if color == chess.WHITE:

@@ -23,21 +23,6 @@ async def safe_cancel(task):
 
 class Cache(object):
     """Core class that will search and write in cache asynchronously."""
-    #def __init__(self):
-    #    """False constructor needed because it can't be async."""
-    #    self.engine = None
-    #    self.uci_pk = None
-    #    self.writing = None
-    #    self.ready = None
-    #    self.reading_task = None
-    #    self.writing_task = None
-    #    self.found = None
-    #    self.fetch = None
-    #    self.writer = None
-    #    self.reader = None
-    #    self.engine_options = None
-    #    self.filename = None
-        
     def close(self):
         if self.writer is not None and self.reader is not None:
                 self._wait()
