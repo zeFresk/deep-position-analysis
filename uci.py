@@ -8,11 +8,11 @@ import os
 
 def write_config(opt, file):
     """Export options dictionnary to config file."""
-    if "multiPV" in opt:
-         del opt["MultiPV"] # the value will be set by us later
-
     for key, value in opt.items():
-        file.write("%s = %s\n"%(str(key), str(value)))
+        if key.lower() == "multipv":
+            continue
+
+        file.write("{:s} = {:s}\n".format(str(key), str(value)))
 
 def update_options_from_config(opt, file):
     """Read a config and update dictionnary opt"""
@@ -40,7 +40,7 @@ def load_options(engine, config):
         config = engine_name + ".cfg"
 
         if not os.path.isfile(config): # no existing config file
-            print("\n!Warning: No config file for %s detected, creating one. Default values used.\n"%(engine_name))
+            print("\n!Warning: No config file for {:s} detected, creating one. Default values used.\n".format(engine_name))
             f = open(config, "w")
 
             opt = default_options(engine)
@@ -56,5 +56,5 @@ def load_options(engine, config):
         return opt
 
     else: #no config found
-        sys.stderr.write("!!Error: config %s doesn't exists ! Exiting...\n")
+        sys.stderr.write("!!Error: config {:s} doesn't exists ! Exiting...\n")
         sys.exit(-2)

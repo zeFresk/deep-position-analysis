@@ -75,7 +75,7 @@ class Cache(object):
         self.writing = False
         self.ready = True
         self.reading_task = None
-        self.writing_tasks = None
+        self.writing_task = None
 
         # Needed for search in cache
         self.found = None
@@ -196,7 +196,8 @@ class Cache(object):
             eng_id INTEGER,
             conf_id INTEGER,
             FOREIGN KEY(eng_id) REFERENCES engine(eng_id),
-            FOREIGN KEY(conf_id) REFERENCES config(conf_id) )''')
+            FOREIGN KEY(conf_id) REFERENCES config(conf_id),
+            CONSTRAINT UC_engine_config UNIQUE(eng_id, conf_id) )''')
         self.writer.execute(
             '''CREATE TABLE uci_search (
             search_id INTEGER PRIMARY KEY,
@@ -219,8 +220,6 @@ class Cache(object):
             FOREIGN KEY(fen_hash) REFERENCES fen(fen_hash),
             FOREIGN KEY(search_id) REFERENCES uci_search(search_id)
             CONSTRAINT UC_pvs UNIQUE (fen_hash, search_id) )''')
-        
-        self.writer.execute("COMMIT")
 
         #unlock
         self.ready = True
@@ -277,6 +276,9 @@ class Cache(object):
             pair_ids = []
 
             for key,value in self.engine_options.items():
+                if key.lower() == "multipv": # We don't want to save multiPV in config
+                    continue
+
                 self.writer.execute(
                     '''INSERT OR IGNORE INTO key(key_str)
                     VALUES (?)''', (key,))
@@ -309,7 +311,7 @@ class Cache(object):
 
             # uci engine
             self.writer.execute(
-                '''INSERT INTO uci_engine(eng_id,conf_id)
+                '''INSERT OR IGNORE INTO uci_engine(eng_id,conf_id)
                 VALUES (
                 (SELECT eng_id FROM engine WHERE eng_name=?),
                 ?)''', (self.engine.name, conf_id))

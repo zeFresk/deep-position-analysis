@@ -37,8 +37,13 @@ def parse_pv(pv_str, depth):
 def check_args(args): # Needed in next function
     """Make sure all needed arguments are set correctly, else exit."""
     if not os.path.isfile(args.engine_path):
-        sys.stderr.write("!!Error: %s engine doesn't exists !\n"%(args.engine_path))
+        sys.stderr.write("!!Error: {:s} engine doesn't exists !\n".format(args.engine_path))
         sys.exit(-1)
+
+    for fn in args.fen_files:
+        if not os.path.isfile(fn):
+            sys.stderr.write("!!Error: file doesn't exists : {:s} !\n".format(fn))
+            sys.exit(-1)
 
     if args.nodes < 0 and args.sec < 0: #no stopping condition
         sys.stderr.write("!!Error: No stopping conditions, please set --nodes or --time !\n")
@@ -47,9 +52,10 @@ def check_args(args): # Needed in next function
     if args.nodes < 0: args.nodes = None
     if args.sec < 0: args.sec = None
 
+    str_pv = args.pv
     args.pv = parse_pv(args.pv, args.depth)
     if args.pv == None: # Error when parsing PV
-        sys.stderr.write("!!Error: Incorrect PV : %s!\n"%(args.pv))
+        sys.stderr.write("!!Error: Incorrect PV expression : {:s} !\n".format(str_pv))
         sys.exit(-1)
 
 

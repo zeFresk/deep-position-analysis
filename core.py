@@ -146,7 +146,7 @@ class Explorator(object):
             if not new_board.is_game_over(claim_draw=True) and not self.above_threshold(score): # If the game isn't drawn or won by a player we continue
                 await self._explore_rec(new_board, depth-1)
             else:
-                self.delete_subnodes(board, depth) # We need to update its value because less nodes need to be explored
+                self.delete_subnodes(board, depth-1) # We need to update its value because less nodes need to be explored
     
         return self.fen_results
 
@@ -190,7 +190,6 @@ class Explorator(object):
         ret = []
         with self.info_handler: # We need to lock the handler
             if self.info_handler.info["multipv"] < self.pv.get_pvs_from(board,depth): #less pv generated than requested, whatever the reason
-                print("Hello")
                 for j in range(self.pv.get_pvs_from(board,depth) - self.info_handler.info["multipv"]): # We need to update its value because there's less nodes need to explore
                     self.delete_subnodes(board, depth-1)
             for i in range(1, self.info_handler.info["multipv"]+1):

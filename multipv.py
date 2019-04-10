@@ -14,7 +14,7 @@ import chess
 
 def make_pv_from_match(matches):
     """Create half of the PV tuple from match object of a complex expression."""
-    inc = 0 if matches[3] == "" else int(matches[3])
+    inc = 1 if matches[3] == "" else int(matches[3])
     return (int(matches[1]), int(matches[2]), inc)
 
 def parse_pv_exp(pv_exp):
@@ -29,10 +29,16 @@ def parse_pv_exp(pv_exp):
     digit_only = r"^(\d+)$"
     re_digit_only = re.compile(digit_only)
 
-    complex_expression = r"^(\d+)([+-]\d+)/(\d*)[pP]$"
+    complex_expression = r"^(\d+)([+-]\d+)[/e]?(\d*)[mM]?$"
     re_cexp = re.compile(complex_expression)
 
-    composed_expression = r"^(\d+[+-]\d+/\d*p|\d+)([WwBb])(\d+[+-]\d+/\d*p|\d+)([WwBb])$"
+    composed_expression = r"^(" \
+        + digit_only[1:-1].replace("(","").replace(")","") \
+        + r"|" + complex_expression[1:-1].replace("(","").replace(")","") \
+    + r")([WwBb])("  \
+        + digit_only[1:-1].replace("(","").replace(")","") \
+        + r"|" + complex_expression[1:-1].replace("(","").replace(")","") \
+    + r")([WwBb])$"
 
     def parse_singleton(pv_subexp):
         sub_m = re_digit_only.match(pv_subexp)
@@ -79,10 +85,10 @@ class MultiPV(object):
             (w_base, w_increase, w_each), (b_base, b_increase, b_each) = array #unpack
             # White
             for i in range(len(self.white_pvs)):
-                self.white_pvs[len(self.white_pvs)-1-i] = w_base + int((i/(w_each*2)))*w_increase
+                self.white_pvs[len(self.white_pvs)-1-i] = max(w_base + int((i/(w_each*2)))*w_increase, 1)
             # Black
             for i in range(len(self.black_pvs)):
-                self.black_pvs[len(self.black_pvs)-1-i] = b_base + int((i/(b_each*2)))*b_increase
+                self.black_pvs[len(self.black_pvs)-1-i] = max(b_base + int((i/(b_each*2)))*b_increase, 1)
 
         def __get_pvs(self, color, depth):
             if color == chess.WHITE:
@@ -93,7 +99,7 @@ class MultiPV(object):
         def __recursive_gen(self,color, depth):
             if depth == 0:
                 return 1
-            pv_i = self.__get_pvs(color, depth-1)
+            pv_i = self.__get_pvs(color, depth)
             return 1 + pv_i * self.__recursive_gen(not color, depth-1)
         
         def generate_max_nodes(self):
@@ -123,18 +129,10 @@ class MultiPV(object):
                 return self.black_max_nodes[depth]
 
         def get_max_nodes(self, color, depth):
-            if (len(self.white_max_nodes) - depth) % 2 == 0:
-                # Color is the same as the one which started
-                return self.__max_nodes(color, depth-1)
-            else:
-                return self.__max_nodes(not color, depth-1)
+            return self.__max_nodes(color, depth-1)
 
         def get_pvs(self, color, depth):
-            if (len(self.white_max_nodes) - depth) % 2 == 0:
-                # Color is the same as the one which started
                 return self.__get_pvs(color, depth-1)
-            else:
-                return self.__get_pvs(not color, depth-1)
 
 
     def __init__(self, pv_exp, max_depth):
@@ -177,3 +175,11 @@ class MultiPV(object):
     def to_str(self):
         """Converts this to a PV expression."""
         return self.str
+
+    def to_file_str(self):
+        """Returns this to a PV expression suitable in a filename."""
+        ret = self.str.replace("/","e")
+        ret = ret.lower()
+        ret = ret.replace("w","W")
+        ret = ret.replace("b","B")
+        return ret

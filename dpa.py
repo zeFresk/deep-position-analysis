@@ -48,7 +48,7 @@ async def main():
             fens = fens_from_file(filename)
         
             for (i, position_str) in enumerate(fens): #iterate through lines
-                print("\nExploring position %d of %d : [%s]...\n"%(i+1, len(fens), position_str.strip()))
+                print("\nExploring position {:d} of {:d} : [{:s}]...\n".format(i+1, len(fens), position_str.strip()))
                 board = chess.Board(position_str) # We load board
 
                 time_st = time.perf_counter() # Setting up starting time to keep track
@@ -59,8 +59,8 @@ async def main():
                 tree = await exp.explore(board, engine, cache, args.pv, args.depth, args.nodes, msec, args.threshold, args.appending)
 
                 # finished : show message
-                elapsed = time.perf_counter() - time_st # in seconds
-                print("Completed position analysis %d of %d from %s in %d hours %d minutes %d seconds.\nSaving result.\n"%(i+1, len(fens), filename, elapsed // (60*60), (elapsed // 60)%60, elapsed % 60))
+                elapsed = int(time.perf_counter() - time_st) # in seconds
+                print("Completed position analysis {:d} of {:d} from {:s} in {:d} hours {:d} minutes {:d} seconds.\nSaving result.\n".format(i+1, len(fens), filename, elapsed // (60*60), (elapsed // 60)%60, elapsed % 60))
 
                 output_filename = format_filename(filename, i, args) #retrieve output filename without extension
             
@@ -76,7 +76,7 @@ async def main():
                         last_node = game.end() # iterate through last node from main variation
 
                         txt = "Deep analysis start after that node"
-                        last_node.comment = txt if (last_node.comment == "") else (last_node.comment + " | %s"%(txt)) # if a comment already exists append analysis msg to it
+                        last_node.comment = txt if (last_node.comment == "") else (last_node.comment + " | {:s}".format(txt)) # if a comment already exists append analysis msg to it
 
                         # We append the tree at the end
                         append_variations(tree, last_node, args.depth)
@@ -91,13 +91,3 @@ async def main():
 asyncio.run(main())
 #except:
 #    print("\nExiting...")
-
-#from dynpv import *
-#p = MultiPV("3",3)
-#print(p.max_nodes(chess.WHITE, 3)) # 13
-
-#p = MultiPV("3-1/1p",4)
-#print(p.max_nodes(chess.WHITE, 3)) # 
-
-#p = MultiPV("3W1B",24)
-#print(p.max_nodes(chess.WHITE, 3)) # 7 Need to figure why it doesn't work...
