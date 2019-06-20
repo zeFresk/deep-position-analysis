@@ -3,6 +3,7 @@ import os.path
 import sys
 
 from multipv import MultiPV
+from threshold import Threshold
 
 ###########################################
 ############ Arguments parsing ############
@@ -21,7 +22,7 @@ def make_parser():
     parser.add_argument("--depth", dest="depth", action="store", type=int, default=2, help="number of plies to explore")
     parser.add_argument("--nodes", dest="nodes", action="store", type=int, default=-1, help="nodes to explore at each step before returning best move")
     parser.add_argument("--time", dest="sec", action="store", type=int, default=-1, help="time in seconds passed at each step before returning best move")
-    parser.add_argument("--threshold", dest="threshold", action="store", type=int, default=25600, help="stop exploring further if the score (in centipawn) is above threshold.")
+    parser.add_argument("--threshold", dest="threshold", action="store", type=str, default="", help="stop exploring further if score (in PAWNS) is above threshold. (Threshold expression)")
     parser.add_argument("--tree", dest="tree_exp", action="store_const", const=True, default=False, help="export final tree directly")
     parser.add_argument("--appending", dest="appending", action="store_const", const=True, default=False, help="append possible continuation to end nodes.") # carefull, inverted
     
@@ -31,6 +32,13 @@ def parse_pv(pv_str, depth):
     """Parse a PV string to returns PV object."""
     try:
         return MultiPV(pv_str, depth)
+    except:
+        return None
+
+def parse_threshold(threshold_str):
+    """Parse a Threshold expression and returns None if it fails, else returns threshold object."""
+    try:
+        return Threshold(threshold_str)
     except:
         return None
 
@@ -56,6 +64,12 @@ def check_args(args): # Needed in next function
     args.pv = parse_pv(args.pv, args.depth)
     if args.pv == None: # Error when parsing PV
         sys.stderr.write("!!Error: Incorrect PV expression : {:s} !\n".format(str_pv))
+        sys.exit(-1)
+
+    str_threshold = args.threshold
+    args.threshold = parse_threshold(args.threshold)
+    if args.threshold == None: # Error when parsing Threshold expression
+        sys.stderr.write("!!Error: Incorrect Threshold expression : {:s} !\n".format(str_threshold))
         sys.exit(-1)
 
 

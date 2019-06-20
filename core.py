@@ -5,6 +5,7 @@ import copy
 from misc import *
 from uci import *
 from multipv import *
+from threshold import *
 
 ###########################################
 ####### Core functions & exploration ######
@@ -32,7 +33,7 @@ class Explorator(object):
         self.out = None
         self.fen_results = None
 
-    async def explore(self, board, engine, cache, pv, depth, nodes, msec = None, threshold = 25600,appending = True):
+    async def explore(self, board, engine, cache, pv, depth, nodes, msec = None, threshold = Threshold(""),appending = True):
         """
             Explore the current pgn position 'depth' plys deep using engine
 
@@ -54,7 +55,7 @@ class Explorator(object):
         self.pv = pv
         self.nodes = nodes
         self.msec = msec
-        self.threshold = threshold/100
+        self.threshold = threshold
         self.appending = appending
         ##################
         # Here are all the variables commons to all recursions
@@ -144,7 +145,7 @@ class Explorator(object):
                 raise RuntimeError("Illegal move : {:s} in {:s}\n".format(new_board.san(mo), new_board.fen())) # We throw an exception
 
             new_board.push(mo)
-            if not new_board.is_game_over(claim_draw=True) and not self.above_threshold(score): # If the game isn't drawn or won by a player we continue
+            if not new_board.is_game_over(claim_draw=True) and not self.above_threshold(board, score): # If the game isn't drawn or won by a player we continue
                 await self._explore_rec(new_board, depth-1)
             else:
                 self.delete_subnodes(board, depth-1) # We need to update its value because less nodes need to be explored
@@ -179,22 +180,23 @@ class Explorator(object):
         self.tot -= self.pv.max_nodes_from(board, depth-1)
 
 
-    def above_threshold(self, score):
+    def above_threshold(self, board, score):
         """Returns wether a score is above threshold or not."""
         if score[1] == "M": # This a mate score !
-            return 128.0 > self.threshold # A mate value is 128
+            return self.threshold.above_threshold(normalize(board, 128)) # A mate value is 128
         else:
-            return abs(float(score)) > self.threshold
+            return self.threshold.above_threshold(normalize(board, float(score[1:])))
 
     def get_all_pvs(self, board, depth):
         """Returns all the first moves computed and update total number of nodes to explore if needed."""
         ret = []
         with self.info_handler: # We need to lock the handler
-            if self.info_handler.info["multipv"] < self.pv.get_pvs_from(board,depth): #less pv generated than requested, whatever the reason
-                for j in range(self.pv.get_pvs_from(board,depth) - self.info_handler.info["multipv"]): # We need to update its value because there's less nodes need to explore
+            multipv = 1 if "multipv" not in self.info_handler.info else self.info_handler.info["multipv"] # If no "multipv" it indicates that MultiPV = 1
+            if multipv < self.pv.get_pvs_from(board,depth): #less pv generated than requested, whatever the reason
+                for j in range(self.pv.get_pvs_from(board,depth) - multipv): # We need to update its value because there's less nodes need to explore
                     self.delete_subnodes(board, depth-1)
-            for i in range(1, self.info_handler.info["multipv"]+1):
-                ret += [[self.info_handler.info["pv"][i], self.get_pv_score(board, i)]]
+            for i in range(1, multipv+1):
+                ret += [[self.info_handler.info["pv"][i], self.get_normalized_pv_score_str(board, i)]]
         
         return ret
 
@@ -224,7 +226,7 @@ class Explorator(object):
                 prct = 1.00
 
             self.out.write("\r" + " "*40) # cleaning line
-            self.out.write("\r>> {:.0%} @ {:s}nodes/s : {:s} ({:s}){:s}".format(prct, format_nodes(int(self.info_handler.info["nps"])), current_board.san(self.info_handler.info["pv"][1][0]), self.get_pv_score(current_board, 1), end))
+            self.out.write("\r>> {:.0%} @ {:s}nodes/s : {:s} ({:s}){:s}".format(prct, format_nodes(int(self.info_handler.info["nps"])), current_board.san(self.info_handler.info["pv"][1][0]), self.get_normalized_pv_score_str(current_board, 1), end))
             self.out.flush()
 
     def display_cached_progress(self, current_board):
@@ -235,7 +237,7 @@ class Explorator(object):
         self.out.write("\r>> {:.0%} @ {:s}nodes/s : {:s} ({:s})\n\n".format(1., ".Inf", current_board.san(self.get_pv_cached(current_board, 0)[0]), self.get_pv_score_cached(current_board, 0)))
         self.out.flush()
 
-    def get_pv_score(self, board, i):
+    def get_normalized_pv_score_str(self, board, i):
         """Returns score associated to i-th PV formatted as a string. !!! WE SUPPOSE HANDLER IS LOCKED !!!"""
         return normalized_score_str(board, self.info_handler.info["score"][i].cp, self.info_handler.info["score"][i].mate)
 
