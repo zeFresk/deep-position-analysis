@@ -37,8 +37,16 @@ async def main():
     engine = chess.uci.popen_engine(engine_path)
     engine.uci()
    
-    opt = load_options(engine, args.engine_config)
-    opt["MultiPV"] = args.pv.max_pv()
+    opt, first_load = load_options(engine, args.engine_config)
+
+    if first_load: # First time this engine is used
+        print("It seems to be the first time this engine was used.\n"
+        "A new config file has been created in the working directory.\n"
+        "Please edit it to the correct settings or let them to their default values, then run this command again.\n")
+        return
+    else:
+        opt["MultiPV"] = args.pv.max_pv()
+
     engine.setoption(opt)
     t = hash_opt(opt)
 

@@ -34,7 +34,10 @@ def default_options(engine):
     return ret
 
 def load_options(engine, config):
-    """ Load engine uci options from config, if no config exists will create one."""
+    """ 
+    Load engine uci options from config, 
+    if no config exists will create one. 
+    Returns a tuple : (config , boolean containing whereas or not we used a default config)"""
     if config == "<autodiscover>": #no config provided
         engine_name = engine.name.split()[0] # first string in name
         config = engine_name + ".cfg"
@@ -46,14 +49,14 @@ def load_options(engine, config):
             opt = default_options(engine)
             write_config(opt, f) # exporting config to file
 
-            return opt
+            return (opt, True)
 
     if os.path.isfile(config): # custom or default config exists
         opt = default_options(engine)
 
         f = open(config, "r")
         update_options_from_config(opt, f)
-        return opt
+        return (opt, False)
 
     else: #no config found
         sys.stderr.write("!!Error: config {:s} doesn't exists ! Exiting...\n")
