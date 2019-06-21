@@ -28,6 +28,13 @@ def fmt_mate(mate_score):
     else: # mate in X for white
         return "+M{:d}".format(abs(mate_score))
 
+def format_time(msec):
+    """Converts msec to correct unit. Returns it as formatted string."""
+    if msec < 10**3: #ms
+        return str(msec)+"ms"
+    else:
+        return str(msec//1000)+"s"
+
 def elapsed_since(timestamp):
     """Returns elapsed time since a given timestamp in seconds.
     It will always returns at least one."""
@@ -95,3 +102,10 @@ def keep_firstn(lst, n):
         return lst
     else:
         return lst[:n]
+
+def wait_for(handler, k):
+    """Returns handler.info[k] when it is available. Blocking."""
+    while not k in handler.info:
+        time.sleep(0.00001) # Sleep for 10 µs to not use full core
+
+    return handler.info[k]

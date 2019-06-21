@@ -69,6 +69,7 @@ class Explorator(object):
 
         self.pos_index = 0 # Number of variations already explored
         self.cached_found = 0 # Number of positions found in cache (needed to get accurate time estimates)
+        self.avg_nps = 0 # Average nodes per second
 
         self.fen_results = dict() # (hash_128) -> [(PV,score),...,(PVN,scoreN)]
 
@@ -102,8 +103,16 @@ class Explorator(object):
             return None #terminal node
 
         # Start search in cache
-        if self.cache != None and self.nodes != None:
-            await self.cache.search_fen(self.nodes, hf, self.pv.get_pvs_from(board, depth))
+        if self.cache != None:
+            tmp_nodes = self.nodes
+            if self.msec != None:
+                if self.avg_nps > 0:
+                    tmp_nodes = self.avg_nps * self.msec * 1000
+                else:
+                    tmp_nodes = sys.maxsize
+            
+            await self.cache.search_fen(tmp_nodes, self.msec, hf, self.pv.get_pvs_from(board, depth))
+
 
         # Setting-up position for engine
         self.engine.position(board)
@@ -127,13 +136,16 @@ class Explorator(object):
             self.fen_results[hf] = keep_firstn(pvs, self.pv.get_pvs_from(board, depth)) # Delete uneeded pvs
             self.display_cached_progress(board)
         else:
+            if self.msec is not None:
+                self.update_nps()
+
             pvs = self.get_all_pvs(board, depth) # We extract all PVs available
             self.fen_results[hf] = keep_firstn(pvs, self.pv.get_pvs_from(board, depth)) # Delete uneeded pvs
             self.display_position_progress(board, end="\n\n") # Needed if we don't want the line to be blank in case it finished too fast
 
         # add them to cache if set
-        if self.cache != None and self.nodes != None:
-            await self.cache.save_fen(board.fen(), self.nodes, self.pv.max_pv(), pvs)
+        if self.cache != None:
+            await self.cache.save_fen(board.fen(), self.nodes, wait_for(self.info_handler, "nodes"), self.msec, self.pv.max_pv(), pvs)
 
         self.pos_index += 1
 
@@ -248,3 +260,7 @@ class Explorator(object):
     def get_pv_score_cached(self, board, i):
         """Returns score associated to i-th PV formatted as a string."""
         return self.fen_results[hash_fen(board.fen())][i][1]
+
+    def update_nps(self):
+        """Update average nps with latest nodes computed."""
+        self.avg_nps = (self.pos_index/(self.pos_index+1))*self.avg_nps + (1/(self.pos_index+1))*wait_for(self.info_handler,"nps")

@@ -92,23 +92,20 @@ class Cache(object):
     ##########
     # Reading functions
     ##########
-    async def search_fen(self, nodes, fen_hash, multipv):
+    async def search_fen(self, nodes, conf_msec, fen_hash, multipv):
         """Start searching for the hash inside local cache. Asynchronous."""
-        if nodes == None:
-            return
-
         async def _search_fen():
             self._wait_ready()
             req = self.reader.execute(
-                '''SELECT pvs_data FROM (SELECT fen_hash, pvs_data, nodes from 
-                        pvs natural join uci_search
+                '''SELECT pvs_data FROM (SELECT fen_hash, pvs_data, pvs_nodes from 
+                        (pvs natural join uci_search)
                         group by search_id, fen_hash
                         having uci_id=?
-                        and nodes >= ?
+                        and (pvs_nodes >= ? or nodes >= ? or msec >= ?)
                         and fen_hash=?
                         and multipv >= ?)
-                    GROUP BY fen_hash having nodes=MAX(nodes)
-                    ''', (self.get_uci_pk(), nodes, blobify(fen_hash), multipv))
+                    GROUP BY fen_hash having pvs_nodes=MAX(pvs_nodes)
+                    ''', (self.get_uci_pk(), nodes, nodes, conf_msec, blobify(fen_hash), multipv))
 
             r = req.fetchone()
             if r != None: # We found datas !!
@@ -149,6 +146,7 @@ class Cache(object):
             self.writer.execute('''DROP TABLE IF EXISTS {:s}'''.format(tb_name))
 
         # Tables creation
+        # UCI config related
         self.writer.execute(
             '''CREATE TABLE key (
             key_id INTEGER PRIMARY KEY,
@@ -171,10 +169,14 @@ class Cache(object):
             PRIMARY KEY(conf_id,pair_id),
             FOREIGN KEY(conf_id) REFERENCES config(conf_id),
             FOREIGN KEY(pair_id) REFERENCES pair(pair_id) ) WITHOUT ROWID''')
+
+        # Engine related
         self.writer.execute(
             '''CREATE TABLE engine (
             eng_id INTEGER PRIMARY KEY,
             eng_name VARCHAR(32) UNIQUE );''')
+
+        # Engine + config related
         self.writer.execute(
             '''CREATE TABLE uci_engine (
             uci_id INTEGER PRIMARY KEY,
@@ -183,24 +185,33 @@ class Cache(object):
             FOREIGN KEY(eng_id) REFERENCES engine(eng_id),
             FOREIGN KEY(conf_id) REFERENCES config(conf_id),
             CONSTRAINT UC_engine_config UNIQUE(eng_id, conf_id) )''')
+
+        #  Search related
         self.writer.execute(
             '''CREATE TABLE uci_search (
             search_id INTEGER PRIMARY KEY,
             uci_id,
             nodes INTEGER,
+            msec INTEGER,
             multipv INTEGER,
             FOREIGN KEY(uci_id) REFERENCES uci_engine(uci_id),
-            CONSTRAINT CK_nodes CHECK (nodes > 0),
-            CONSTRAINT UC_search UNIQUE (uci_id, nodes) )''')
+            CONSTRAINT CK_nodes_or_msec CHECK (nodes > 0 OR msec > 0),
+            CONSTRAINT UC_search_nodes UNIQUE (uci_id, nodes),
+            CONSTRAINT UC_search_msec UNIQUE (uci_id, msec))''')
+
+        # Chess position related
         self.writer.execute(
             '''CREATE TABLE fen (
             fen_hash BLOB PRIMARY KEY,
             fen_str VARCHAR(128) UNIQUE )''')
+
+        # Pvs related
         self.writer.execute(
             '''CREATE TABLE pvs (
             pv_id INTEGER PRIMARY KEY,
             fen_hash BLOB,
             search_id INTEGER,
+            pvs_nodes INTEGER,
             pvs_data BLOB,
             FOREIGN KEY(fen_hash) REFERENCES fen(fen_hash),
             FOREIGN KEY(search_id) REFERENCES uci_search(search_id)
@@ -211,7 +222,7 @@ class Cache(object):
         self._unlock()
 
 
-    async def save_fen(self, fen, nodes, multipv, pvs):
+    async def save_fen(self, fen, config_nodes, calculated_nodes, config_msec, multipv, pvs):
         """Save pvs in local cache. Asynchronous."""
         async def _write_fen():
             self._wait()
@@ -228,16 +239,23 @@ class Cache(object):
 
             # Add search params
             self.writer.execute(
-                '''INSERT OR IGNORE INTO uci_search(uci_id, nodes, multipv)
-                VALUES (?,?,?)''', (self.get_uci_pk(), nodes, multipv))
-            search_id = self.reader.execute(
-                '''SELECT search_id FROM uci_search
-                WHERE uci_id=? AND nodes=? AND multipv=?''', (self.get_uci_pk(), nodes, multipv)).fetchone()['search_id']
+                '''INSERT OR IGNORE INTO uci_search(uci_id, nodes, msec, multipv)
+                VALUES (?,?,?,?)''', (self.get_uci_pk(), config_nodes, config_msec, multipv))
+            search_id = None
+            if config_msec is None:
+                search_id = self.reader.execute(
+                    '''SELECT search_id FROM uci_search
+                    WHERE uci_id=? AND nodes=? AND msec IS NULL AND multipv=?''', (self.get_uci_pk(), config_nodes, multipv)).fetchone()['search_id']
+            elif config_nodes is None:
+                search_id = self.reader.execute(
+                    '''SELECT search_id FROM uci_search
+                    WHERE uci_id=? AND nodes IS NULL AND msec=? AND multipv=?''', (self.get_uci_pk(), config_msec, multipv)).fetchone()['search_id']
+
 
             # Insert pvs
-            self.writer.execute('''
-            INSERT OR IGNORE INTO pvs(fen_hash, search_id, pvs_data)
-            VALUES (?,?,?)''', (hf_blob, search_id, pickle.dumps(pvs, protocol=pickle.HIGHEST_PROTOCOL)))
+            self.writer.execute(
+                '''INSERT OR IGNORE INTO pvs(fen_hash, search_id, pvs_nodes, pvs_data)
+            VALUES (?,?,?,?)''', (hf_blob, search_id, calculated_nodes, pickle.dumps(pvs, protocol=pickle.HIGHEST_PROTOCOL)))
             self._unlock()
 
         if not (hash_fen(fen) in self.fetch):

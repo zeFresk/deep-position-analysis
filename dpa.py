@@ -60,11 +60,10 @@ async def main():
                 board = chess.Board(position_str) # We load board
 
                 time_st = time.perf_counter() # Setting up starting time to keep track
-                msec = None if args.sec == None else args.sec*1000 # converting seconds to ms if needed
             
                 # Explore current fen
                 exp = Explorator()
-                tree = await exp.explore(board, engine, cache, args.pv, args.depth, args.nodes, msec, args.threshold, args.appending)
+                tree = await exp.explore(board, engine, cache, args.pv, args.depth, args.nodes, args.msec, args.threshold, args.appending)
 
                 # finished : show message
                 elapsed = int(time.perf_counter() - time_st) # in seconds
