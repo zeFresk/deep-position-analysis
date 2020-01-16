@@ -119,7 +119,6 @@ class Explorator(object):
         # Start search
         cmd = self.engine.go(nodes=self.nodes, movetime=self.msec, async_callback=True)
         self.display_global_progress()
-
         while not cmd.done(): # until search is finished
             if self.cache != None and self.cache.fen_found(hf): # found in cache
                 self.engine.stop()
@@ -145,7 +144,8 @@ class Explorator(object):
 
         # add them to cache if set
         if self.cache != None:
-            await self.cache.save_fen(board.fen(), self.nodes, wait_for(self.info_handler, "nodes"), self.msec, self.pv.max_pv(), pvs)
+            if not self.cache.fen_found(hf): # fix bug with infinite wait if nodes too low !!Optimizable
+                await self.cache.save_fen(board.fen(), self.nodes, wait_for(self.info_handler, "nodes"), self.msec, self.pv.max_pv(), pvs)
 
         self.pos_index += 1
 

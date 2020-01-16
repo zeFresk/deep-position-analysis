@@ -271,3 +271,6 @@ __pycache__/
 # VS related
 *.pyproj
 *.sln
+
+# DB
+.cached.db
