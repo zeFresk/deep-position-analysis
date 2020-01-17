@@ -86,7 +86,7 @@ async def main():
                         last_node.comment = txt if (last_node.comment == "") else (last_node.comment + " | {:s}".format(txt)) # if a comment already exists append analysis msg to it
 
                         # We append the tree at the end
-                        append_variations(tree, last_node, args.depth)
+                        append_variations(tree, last_node, args.depth, args.appending)
 
                     # We save the game as pgn
                     print(game, file=open("{:s}.pgn".format(output_filename), "w"), end="\n\n")

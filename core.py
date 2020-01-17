@@ -110,7 +110,7 @@ class Explorator(object):
                     tmp_nodes = self.avg_nps * self.msec * 1000
                 else:
                     tmp_nodes = sys.maxsize
-            
+
             await self.cache.search_fen(tmp_nodes, self.msec, hf, self.pv.get_pvs_from(board, depth))
 
 

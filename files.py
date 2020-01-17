@@ -69,13 +69,13 @@ def load_ith_from_pgn(filename, i):
 def export_raw_tree(tree, filename): # Warning : Ugly, need to be improved
     """Export a tree object to a new file called filename."""
     # We save the tree
-    print(tree, file=open("{:s}.tree".format(output_filename), "w"), end="\n")
+    print(tree, file=open("{:s}.tree".format(filename), "w"), end="\n")
 
     #delete artefacts
-    f = open("{:s}.tree".format(output_filename), "r")
+    f = open("{:s}.tree".format(filename), "r")
     lines = f.readlines()
     f.close()
-    out = open("{:s}.tree".format(output_filename), "w")
+    out = open("{:s}.tree".format(filename), "w")
 
     reg = r"Move\.from_uci\(\'(\w+)\'\)"
     for l in lines:
@@ -90,19 +90,29 @@ def export_raw_tree(tree, filename): # Warning : Ugly, need to be improved
 ######### Tree exports functions ##########
 ###########################################
 
-def append_variations(tree, node, depth):
-    """Append all variation from tree (dict) in pgn"""
+def append_variations(tree, node, depth, appending=False):
+    """Append all variation from tree (dict) in pgn, if --apending is set engine line will be put at the end."""
     def _append_variations(node, depth): # Avoid dict copy
         if depth == 0:
             return
-    
+
         start_fen = node.board().fen() # fen to start with
         h = hash_fen(start_fen)
         if h in tree:
             pvs = tree[hash_fen(start_fen)] # we get all pvs from this fen
+
             for pv in pvs:
-                moves, score = pv
-                child = node.add_variation(moves[0], comment=score)
-                _append_variations(child, depth-1)
+                list_moves, line_score = pv
+
+                tmpnode = node
+                if depth == 1 and appending:
+                    for i, move in enumerate(list_moves):
+                        tmpnode = tmpnode.add_variation(move, comment=(line_score if i == 0 else ""))
+                        return
+                else:
+                    child = node.add_variation(list_moves[0], comment=line_score)
+                    _append_variations(child, depth-1)
+
+
 
     _append_variations(node, depth)
