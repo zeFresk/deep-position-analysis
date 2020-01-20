@@ -50,9 +50,11 @@ async def main():
     engine.setoption(opt)
     t = hash_opt(opt)
 
+    files_list = make_fileslist(args.fen_files)
+
 
     with (None if not args.use_cache else Cache(20, ".cached.db", engine, opt)) as cache: # Needed to close db on exception or on termination
-        for filename in args.fen_files:
+        for filename in files_list:
             fens = fens_from_file(filename)
         
             for (i, position_str) in enumerate(fens): #iterate through lines

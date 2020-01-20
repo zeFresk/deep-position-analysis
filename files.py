@@ -1,11 +1,21 @@
 import chess.pgn
 import os.path
 
+import glob
+
 from misc import * # is_pgn...
 
 ###########################################
 ############## File parsing ###############
 ###########################################
+
+def make_fileslist(path_list):
+    """Get lists of files from paths which may contains wildcards and symbols."""
+    ret = []
+    for p in path_list:
+        ret += glob.glob(p)
+
+    return ret
 
 def fens_from_file(filename):
     """Extract all the fen inside a .pgn or .epd"""
