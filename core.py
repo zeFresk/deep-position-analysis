@@ -20,6 +20,7 @@ class Explorator(object):
         self.pv = None
         self.nodes = None
         self.msec = None
+        self.plydepth = None
         self.threshold = None
         self.appending = None
 
@@ -33,7 +34,7 @@ class Explorator(object):
         self.out = None
         self.fen_results = None
 
-    async def explore(self, board, engine, cache, pv, depth, nodes, msec = None, threshold = Threshold(""),appending = True):
+    async def explore(self, board, engine, cache, pv, depth, nodes, msec = None, plydepth = None, threshold = Threshold(""),appending = True):
         """
             Explore the current pgn position 'depth' plys deep using engine
 
@@ -55,6 +56,7 @@ class Explorator(object):
         self.pv = pv
         self.nodes = nodes
         self.msec = msec
+        self.plydepth = plydepth
         self.threshold = threshold
         self.appending = appending
         ##################
@@ -111,13 +113,13 @@ class Explorator(object):
                 else:
                     tmp_nodes = sys.maxsize
 
-            await self.cache.search_fen(tmp_nodes, self.msec, hf, self.pv.get_pvs_from(board, depth))
+            await self.cache.search_fen(tmp_nodes, self.msec, self.plydepth, hf, self.pv.get_pvs_from(board, depth))
 
 
         # Setting-up position for engine
         self.engine.position(board)
         # Start search
-        cmd = self.engine.go(nodes=self.nodes, movetime=self.msec, async_callback=True)
+        cmd = self.engine.go(nodes=self.nodes, movetime=self.msec, depth=self.plydepth, async_callback=True)
         self.display_global_progress()
         while not cmd.done(): # until search is finished
             if self.cache != None and self.cache.fen_found(hf): # found in cache
@@ -145,7 +147,7 @@ class Explorator(object):
         # add them to cache if set
         if self.cache != None:
             if not self.cache.fen_found(hf): # fix bug with infinite wait if nodes too low !!Optimizable
-                await self.cache.save_fen(board.fen(), self.nodes, wait_for(self.info_handler, "nodes"), self.msec, self.pv.max_pv(), pvs)
+                await self.cache.save_fen(board.fen(), self.nodes, wait_for(self.info_handler, "nodes"), self.msec, self.plydepth, self.pv.max_pv(), pvs)
 
         self.pos_index += 1
 
@@ -226,13 +228,15 @@ class Explorator(object):
     def display_position_progress(self, current_board, end=""):
         """Display the progress analyzing the current position. Can take a lot of time since we need to lock a mutex."""
         #with self.info_handler: # Waiting for the handler to be locked
-        if "nodes" in self.info_handler.info and "pv" in self.info_handler.info and "nps" in self.info_handler.info and "score" in self.info_handler.info and 1 in self.info_handler.info["pv"]: # Make sure all values are set
+        if "nodes" in self.info_handler.info and "pv" in self.info_handler.info and "nps" in self.info_handler.info and "score" in self.info_handler.info and 1 in self.info_handler.info["pv"] and "depth" in self.info_handler.info: # Make sure all values are set
                 
             prct = 0
             if self.nodes != None: #we use nodes as stop
                 prct = int(self.info_handler.info["nodes"])/self.nodes
-            else: # we use time as stop
+            elif self.msec != None: # we use time as stop
                 prct = int(self.info_handler.info["time"])/self.msec
+            elif self.plydepth != None:
+                prct = int(self.info_handler.info["depth"])/self.plydepth
 
             if prct >= 1.00: # we can't exceed 100% !
                 prct = 1.00

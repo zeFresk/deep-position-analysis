@@ -51,7 +51,14 @@ def format_filename(filename, id, args):
     if index == -1:
         index = len(filename)
 
-    stopping_fmt = (format_nodes(args.nodes,"{:1.0f}") +"n") if (args.nodes != None) else format_time(args.msec)
+    stopping_fmt = ""
+    if args.nodes is not None:
+        stopping_fmt = format_nodes(args.nodes,"{:1.0f}") +"n"
+    elif args.msec is not None:
+        stopping_fmt = format_time(args.msec)
+    elif args.plydepth is not None:
+        stopping_fmt = str(args.plydepth) + "d"
+
     return "{:s}{:d}_{:s}_{:s}v_{:d}p".format(filename[0:index], id, stopping_fmt, args.pv.to_file_str(), args.depth)
 
 def new_default_game(board, engine_name, args):

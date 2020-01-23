@@ -65,7 +65,7 @@ async def main():
             
                 # Explore current fen
                 exp = Explorator()
-                tree = await exp.explore(board, engine, cache, args.pv, args.depth, args.nodes, args.msec, args.threshold, args.appending)
+                tree = await exp.explore(board, engine, cache, args.pv, args.depth, args.nodes, args.msec, args.plydepth, args.threshold, args.appending)
 
                 # finished : show message
                 elapsed = int(time.perf_counter() - time_st) # in seconds

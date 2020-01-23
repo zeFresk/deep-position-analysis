@@ -92,7 +92,7 @@ class Cache(object):
     ##########
     # Reading functions
     ##########
-    async def search_fen(self, nodes, conf_msec, fen_hash, multipv):
+    async def search_fen(self, nodes, conf_msec, plydepth, fen_hash, multipv):
         """Start searching for the hash inside local cache. Asynchronous."""
         async def _search_fen():
             self._wait_ready()
@@ -101,11 +101,11 @@ class Cache(object):
                         (pvs natural join uci_search)
                         group by search_id, fen_hash
                         having uci_id=?
-                        and (pvs_nodes >= ? or nodes >= ? or msec >= ?)
+                        and (pvs_nodes >= ? or nodes >= ? or msec >= ? or plydepth >= ?)
                         and fen_hash=?
                         and multipv >= ?)
                     GROUP BY fen_hash having pvs_nodes=MAX(pvs_nodes)
-                    ''', (self.get_uci_pk(), nodes, nodes, conf_msec, blobify(fen_hash), multipv))
+                    ''', (self.get_uci_pk(), nodes, nodes, conf_msec, plydepth, blobify(fen_hash), multipv))
 
             r = req.fetchone()
             if r != None: # We found datas !!
@@ -193,10 +193,12 @@ class Cache(object):
             uci_id,
             nodes INTEGER,
             msec INTEGER,
+            plydepth INTEGER,
             multipv INTEGER,
             FOREIGN KEY(uci_id) REFERENCES uci_engine(uci_id),
-            CONSTRAINT CK_nodes_or_msec CHECK (nodes > 0 OR msec > 0),
+            CONSTRAINT CK_nodes_or_msec_or_depth CHECK (nodes > 0 OR msec > 0 OR plydepth > 0),
             CONSTRAINT UC_search_nodes UNIQUE (uci_id, nodes),
+            CONSTRAINT UC_search_depth UNIQUE (uci_id, plydepth),
             CONSTRAINT UC_search_msec UNIQUE (uci_id, msec))''')
 
         # Chess position related
@@ -222,7 +224,7 @@ class Cache(object):
         self._unlock()
 
 
-    async def save_fen(self, fen, config_nodes, calculated_nodes, config_msec, multipv, pvs):
+    async def save_fen(self, fen, config_nodes, calculated_nodes, config_msec, config_depth, multipv, pvs):
         """Save pvs in local cache. Asynchronous."""
         async def _write_fen():
             self._wait()
@@ -239,17 +241,25 @@ class Cache(object):
 
             # Add search params
             self.writer.execute(
-                '''INSERT OR IGNORE INTO uci_search(uci_id, nodes, msec, multipv)
-                VALUES (?,?,?,?)''', (self.get_uci_pk(), config_nodes, config_msec, multipv))
+                '''INSERT OR IGNORE INTO uci_search(uci_id, nodes, msec, plydepth, multipv)
+                VALUES (?,?,?,?,?)''', (self.get_uci_pk(), config_nodes, config_msec, config_depth, multipv))
             search_id = None
-            if config_msec is None:
-                search_id = self.reader.execute(
-                    '''SELECT search_id FROM uci_search
-                    WHERE uci_id=? AND nodes=? AND msec IS NULL AND multipv=?''', (self.get_uci_pk(), config_nodes, multipv)).fetchone()['search_id']
-            elif config_nodes is None:
-                search_id = self.reader.execute(
-                    '''SELECT search_id FROM uci_search
-                    WHERE uci_id=? AND nodes IS NULL AND msec=? AND multipv=?''', (self.get_uci_pk(), config_msec, multipv)).fetchone()['search_id']
+            req = '''SELECT search_id FROM uci_search
+                    WHERE uci_id=? AND nodes{:s} AND msec{:s} AND plydepth{:s} AND multipv=?'''.format(
+                            " IS NULL" if config_nodes is None else "=?",
+                            " IS NULL" if config_msec is None else "=?",
+                            " IS NULL" if config_depth is None else "=?")
+            req_vars = [self.get_uci_pk()]
+            if config_nodes is not None:
+                req_vars += [config_nodes]
+            if config_msec is not None:
+                req_vars += [config_msec]
+            if config_depth is not None:
+                req_vars += [config_depth]
+            req_vars += [multipv]
+
+            search_id = self.reader.execute(req, req_vars).fetchone()['search_id']
+
 
 
             # Insert pvs
