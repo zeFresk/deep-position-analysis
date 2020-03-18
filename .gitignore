@@ -272,4 +272,7 @@ __pycache__/
 *.pyproj
 *.sln
 
+
 *.sh
+.cached.db
+

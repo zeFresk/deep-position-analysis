@@ -50,9 +50,11 @@ async def main():
     engine.setoption(opt)
     t = hash_opt(opt)
 
+    files_list = make_fileslist(args.fen_files)
+
 
     with (None if not args.use_cache else Cache(20, ".cached.db", engine, opt)) as cache: # Needed to close db on exception or on termination
-        for filename in args.fen_files:
+        for filename in files_list:
             fens = fens_from_file(filename)
         
             for (i, position_str) in enumerate(fens): #iterate through lines
@@ -63,7 +65,7 @@ async def main():
             
                 # Explore current fen
                 exp = Explorator()
-                tree = await exp.explore(board, engine, cache, args.pv, args.depth, args.nodes, args.msec, args.threshold, args.appending)
+                tree = await exp.explore(board, engine, cache, args.pv, args.depth, args.nodes, args.msec, args.plydepth, args.threshold, args.appending)
 
                 # finished : show message
                 elapsed = int(time.perf_counter() - time_st) # in seconds
@@ -86,7 +88,7 @@ async def main():
                         last_node.comment = txt if (last_node.comment == "") else (last_node.comment + " | {:s}".format(txt)) # if a comment already exists append analysis msg to it
 
                         # We append the tree at the end
-                        append_variations(tree, last_node, args.depth)
+                        append_variations(tree, last_node, args.depth, args.appending)
 
                     # We save the game as pgn
                     print(game, file=open("{:s}.pgn".format(output_filename), "w"), end="\n\n")
