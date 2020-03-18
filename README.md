@@ -29,7 +29,7 @@ How to install
 It's really easy : just download the .py and it's dependencies
 
 ### Install dependencies
-> pip install python-chess
+> pip install python-chess==0.23.10
 
 ### Clone repository
 > git clone XXX
