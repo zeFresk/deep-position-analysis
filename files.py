@@ -64,7 +64,14 @@ def format_filename(filename, id, args):
 def new_default_game(board, engine_name, args):
     """Returns a Game object with the default headers and board set."""
     game = chess.pgn.Game()
-    stopping = (format_nodes(args.nodes,"{:1.0f}") +" nodes") if (args.nodes != None) else format_time(args.msec)
+    stopping = ""
+    if args.nodes != None:
+        stopping = (format_nodes(args.nodes,"{:1.0f}") +" nodes")
+    elif args.msec != None:
+        stopping = format_time(args.msec)
+    elif args.plydepth != None:
+        stopping = args.plydepth + " plies"
+
     game.headers["Event"] = "DeA using {:s} at {:s} per move, {:s} PV, {:d} ply-depth, of {:s}".format(engine_name, stopping, args.pv.to_str(), args.depth, board.fen())
     game.headers["White"] = engine_name
     game.headers["Black"] = engine_name           
