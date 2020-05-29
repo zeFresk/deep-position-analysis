@@ -70,7 +70,7 @@ def new_default_game(board, engine_name, args):
     elif args.msec != None:
         stopping = format_time(args.msec)
     elif args.plydepth != None:
-        stopping = args.plydepth + " plies"
+        stopping = "{:d} plies".format(args.plydepth)
 
     game.headers["Event"] = "DeA using {:s} at {:s} per move, {:s} PV, {:d} ply-depth, of {:s}".format(engine_name, stopping, args.pv.to_str(), args.depth, board.fen())
     game.headers["White"] = engine_name
