@@ -103,9 +103,41 @@ def keep_firstn(lst, n):
     else:
         return lst[:n]
 
+def cut_off(pvs, cutoff):
+    """Keep move only if abs(bestmove-currentmove) < cutoff."""
+    if cutoff == None or len(pvs) == 0:
+        return pvs
+
+    # We suppose 1st = bestmove
+    max_score = str_to_score(pvs[0][1])
+    ret = []
+    for pv in pvs:
+        mov, score = pv
+        score = str_to_score(score)
+
+        if max_score["mate"] != None: #mate
+            if score["mate"] != None and score["mate"] <= max_score["mate"]:
+                ret += [pv]
+        else:
+            if abs(max_score["cp"]-float(score["cp"])) <= (cutoff/100.):
+                ret += [pv]
+
+    return ret
+
 def wait_for(handler, k):
     """Returns handler.info[k] when it is available. Blocking."""
     while not k in handler.info:
         time.sleep(0.00001) # Sleep for 10 µs to not use full core
 
     return handler.info[k]
+
+def str_to_score(string):
+    """Convert any string score to a score (cp/mate)"""
+    ret = dict(cp=None, mate=None)
+    m = re.search(r"""([+-])*M(\d+)""", string)
+    if m != None: # mate
+        ret["mate"] = int(m.group(2)) * (1 if m.group(1) == "+" else -1)
+    else:
+        ret["cp"] = float(string)
+
+    return ret

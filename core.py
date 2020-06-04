@@ -23,6 +23,7 @@ class Explorator(object):
         self.plydepth = None
         self.threshold = None
         self.appending = None
+        self.cutoff = None
 
         # Variables used globally
         self.crashed_once = None
@@ -34,7 +35,7 @@ class Explorator(object):
         self.out = None
         self.fen_results = None
 
-    async def explore(self, board, engine, cache, pv, depth, nodes, msec = None, plydepth = None, threshold = Threshold(""),appending = True):
+    async def explore(self, board, engine, cache, pv, depth, nodes, msec = None, plydepth = None, threshold = Threshold(""),appending = True, cutoff=None):
         """
             Explore the current pgn position 'depth' plys deep using engine
 
@@ -59,6 +60,7 @@ class Explorator(object):
         self.plydepth = plydepth
         self.threshold = threshold
         self.appending = appending
+        self.cutoff = cutoff
         ##################
         # Here are all the variables commons to all recursions
         self.crashed_once = False # Needed to not print too much errors in case of a crash
@@ -134,14 +136,14 @@ class Explorator(object):
         if self.cache != None and self.cache.fen_found(hf): # found in cache
             self.cached_found += 1
             pvs = self.cache.fetch_pvs(hf)
-            self.fen_results[hf] = keep_firstn(pvs, self.pv.get_pvs_from(board, depth)) # Delete uneeded pvs
+            self.fen_results[hf] = cut_off(keep_firstn(pvs, self.pv.get_pvs_from(board, depth)), self.cutoff) # Delete uneeded pvs
             self.display_cached_progress(board)
         else:
             if self.msec is not None:
                 self.update_nps()
 
             pvs = self.get_all_pvs(board, depth) # We extract all PVs available
-            self.fen_results[hf] = keep_firstn(pvs, self.pv.get_pvs_from(board, depth)) # Delete uneeded pvs
+            self.fen_results[hf] = cut_off(keep_firstn(pvs, self.pv.get_pvs_from(board, depth)), self.cutoff) # Delete uneeded pvs
             self.display_position_progress(board, end="\n\n") # Needed if we don't want the line to be blank in case it finished too fast
 
         # add them to cache if set

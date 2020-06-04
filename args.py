@@ -22,6 +22,7 @@ def make_parser():
     parser.add_argument("--pv", dest="pv", action="store", type=str, default="2", help="number of best moves to explore per node (MultiPV expression)")
     parser.add_argument("--depth", dest="depth", action="store", type=int, default=2, help="number of plies to explore")
     parser.add_argument("--threshold", dest="threshold", action="store", type=str, default="", help="stop exploring further if score (in PAWNS) is above threshold. (Threshold expression)")
+    parser.add_argument("-k", "--cutoff", dest="cutoff", action="store", type=int, default=None, help="ignore moves if they are 'cutoff' cp worse than best move")
     parser.add_argument("--no-cache", dest="use_cache", action="store_const", const=False, default=True, help="use cache (increase I/O)")
     parser.add_argument("-c", "--config", dest="engine_config", action="store", type=str, default="<autodiscover>", help="path to engine configuration")
     parser.add_argument("--tree", dest="tree_exp", action="store_const", const=True, default=False, help="export final tree directly")
