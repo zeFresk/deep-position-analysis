@@ -103,26 +103,12 @@ def keep_firstn(lst, n):
     else:
         return lst[:n]
 
-def cut_off(pvs, cutoff):
+def cut_off(pvs, cutoff, move, color):
     """Keep move only if abs(bestmove-currentmove) < cutoff."""
     if cutoff == None or len(pvs) == 0:
         return pvs
 
-    # We suppose 1st = bestmove
-    max_score = str_to_score(pvs[0][1])
-    ret = []
-    for pv in pvs:
-        mov, score = pv
-        score = str_to_score(score)
-
-        if max_score["mate"] != None: #mate
-            if score["mate"] != None and score["mate"] <= max_score["mate"]:
-                ret += [pv]
-        else:
-            if abs(max_score["cp"]-float(score["cp"])) <= (cutoff/100.):
-                ret += [pv]
-
-    return ret
+    return cutoff.cut_pvs(pvs, move, color)
 
 def wait_for(handler, k):
     """Returns handler.info[k] when it is available. Blocking."""

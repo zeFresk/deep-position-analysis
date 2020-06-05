@@ -136,14 +136,14 @@ class Explorator(object):
         if self.cache != None and self.cache.fen_found(hf): # found in cache
             self.cached_found += 1
             pvs = self.cache.fetch_pvs(hf)
-            self.fen_results[hf] = cut_off(keep_firstn(pvs, self.pv.get_pvs_from(board, depth)), self.cutoff) # Delete uneeded pvs
+            self.fen_results[hf] = cut_off(keep_firstn(pvs, self.pv.get_pvs_from(board, depth)), self.cutoff, board.halfmove_clock/2, board.turn) # Delete uneeded pvs
             self.display_cached_progress(board)
         else:
             if self.msec is not None:
                 self.update_nps()
 
             pvs = self.get_all_pvs(board, depth) # We extract all PVs available
-            self.fen_results[hf] = cut_off(keep_firstn(pvs, self.pv.get_pvs_from(board, depth)), self.cutoff) # Delete uneeded pvs
+            self.fen_results[hf] = cut_off(keep_firstn(pvs, self.pv.get_pvs_from(board, depth)), self.cutoff, board.halfmove_clock/2, board.turn) # Delete uneeded pvs
             self.display_position_progress(board, end="\n\n") # Needed if we don't want the line to be blank in case it finished too fast
 
         # add them to cache if set

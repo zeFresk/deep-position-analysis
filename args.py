@@ -4,6 +4,7 @@ import sys
 
 from multipv import MultiPV
 from threshold import Threshold
+from cutoff import Cutoff
 
 ###########################################
 ############ Arguments parsing ############
@@ -22,7 +23,7 @@ def make_parser():
     parser.add_argument("--pv", dest="pv", action="store", type=str, default="2", help="number of best moves to explore per node (MultiPV expression)")
     parser.add_argument("--depth", dest="depth", action="store", type=int, default=2, help="number of plies to explore")
     parser.add_argument("--threshold", dest="threshold", action="store", type=str, default="", help="stop exploring further if score (in PAWNS) is above threshold. (Threshold expression)")
-    parser.add_argument("-k", "--cutoff", dest="cutoff", action="store", type=int, default=None, help="ignore moves if they are 'cutoff' cp worse than best move")
+    parser.add_argument("-k", "--cutoff", dest="cutoff", action="store", type=str, default=None, help="ignore moves if they are 'cutoff' cp worse than best move")
     parser.add_argument("--no-cache", dest="use_cache", action="store_const", const=False, default=True, help="use cache (increase I/O)")
     parser.add_argument("-c", "--config", dest="engine_config", action="store", type=str, default="<autodiscover>", help="path to engine configuration")
     parser.add_argument("--tree", dest="tree_exp", action="store_const", const=True, default=False, help="export final tree directly")
@@ -43,6 +44,13 @@ def parse_threshold(threshold_str):
         return Threshold(threshold_str)
     except:
         return None
+
+def parse_cutoff(cutoff_str):
+    """Parse a Cutoff expression and returns None if it fails, else returns a Cutoff object."""
+#    try:
+    return Cutoff(cutoff_str)
+ #   except:
+    return None
 
 def check_args(args): # Needed in next function
     """Make sure all needed arguments are set correctly, else exit."""
@@ -78,6 +86,12 @@ def check_args(args): # Needed in next function
         sys.stderr.write("!!Error: Incorrect Threshold expression : {:s} !\n".format(str_threshold))
         sys.exit(-1)
 
+    if args.cutoff != None:
+        str_cutoff = args.cutoff
+        args.cutoff = parse_cutoff(args.cutoff)
+        if args.cutoff == None: # Error when parsing Cutoff expression
+            sys.stderr.write("!!Error: Incorrect Cutoff expression : {:s} !\n".format(str_cutoff))
+            sys.exit(-1)
 
     return args
 
