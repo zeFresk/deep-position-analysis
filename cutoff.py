@@ -32,6 +32,12 @@ class Cutoff:
         if m: # numeric expression
             self.bc = self.wc = int(m.group(0))
             self.wuntil = self.wafter = self.buntil = self.bafter = None
+        elif re_extract.match(expression): # complex, no colors
+            m = re_extract.match(expression) # no := operator because of 3.7 compatibility...
+            self.wc = self.bc = int(m.group(1))
+            self.buntil = self.wuntil = (None if m.lastindex < 2 else int(m.group(2)))
+            self.bafter = self.wafter = (None if m.lastindex < 3 else int(m.group(3)))
+
         else:
             m = re_white.match(expression)
             if m: # white part
