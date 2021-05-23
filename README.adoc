@@ -107,11 +107,11 @@ NOTE: 2 plies = 1 move. `--depth=4` will explore position 2 moves deep.
 
 - `--ply-depth` / `-d` : stop exploring **each node** when the engine reached set depth in **plies**. _Stopping condition_.
 
-- `--threshold` : Don't explore lines if their scores are below set threshold. Can be different for white and black. Can also change during analysis. See ThresholdExpression. Value in **centipawns**.
+- `--threshold` : Don't explore lines if their scores are below set threshold. Can be different for white and black. Can also change during analysis. See ThresholdExpression. Value in **pawns**.
 
 - `--appending` : append the **full line** calculated by the engine to every terminal node.
 
- - `--cutoff` / `-k` : Don't explore lines if their score is below the best line by more than a set amount in **centipawns**.
+ - `--cutoff` / `-k` : Don't explore lines if their score is below the best line by more than a set amount in **pawns**.
 
 - `--config` / `-c` : Use specified engine config.
 
@@ -165,27 +165,27 @@ WARNING: Using time instead of nodes may disable some optimizations such as _pru
 
 === Basic: constant depth and PV, ignore bad positions
 
-> python3 dpa.py -p **--threshold 100** "C:/Engines/stockfish 10/stockfish_10_x64.exe" --pv=2 --depth 3 --nodes 1000000 --appending sicilian.epd
+> python3 dpa.py -p **--threshold 1.00** "C:/Engines/stockfish 10/stockfish_10_x64.exe" --pv=2 --depth 3 --nodes 1000000 --appending sicilian.epd
 
 Often you may want to explore all good moves in a position and the good answers to those moves.
 
-"Good" positions can be defined using `--threshold` and setting a value in centipawns. For example, if you want to ignore position which score are below _-1_ or above _+1_, you could add `--threshold 100` to the parameters.
+"Good" positions can be defined using `--threshold` and setting a value in pawns. For example, if you want to ignore position which score are below _-1_ or above _+1_, you could add `--threshold 1.00` to the parameters.
 
 Now, if you would like to explore online good positions for white you could use
 
-> --threshold 100W
+> --threshold 1.00W
 
-Now the score range is ]-infinity, 100]. You could also specify a threshold for black only using :
+Now the score range is ]-infinity, 1.00]. You could also specify a threshold for black only using :
 
-> --threshold 100B
+> --threshold 1.00B
 
 Or **set one threshold for each color**:
 
-> --threshold 100W200B
+> --threshold 1W2B
 > or
-> --threshold 200B100W
+> --threshold 2B1W
 
-Which result in positions within the range [-200, 100].
+Which result in positions within the range [-2.00, 1.00].
 
 NOTE: Here the score is the position's score, consequently analysing extreme positions may cause problems. To exclude bad moves and not bad positions, see xref:bad-moves[filter out bad moves].
 
@@ -217,7 +217,7 @@ You can also change this parameter as you go deeper inside the tree using a _PVE
 
 > python3 dpa.py --engine lc0 **--pv 1W4-1/1B** --depth 18 --nodes 10000000 --threshold 5 --appending stafford.pgn
 
-You may like to explore less best moves as the analysis progress. In this real example I prepared as white to face the Stafford gambit and wanted to find the single best answers to the four best moves black could play, then following my move I wanted to see what the 3 best follow-up were for my opponent, then the 2 best and finally I wanted to continue the variation for 6 moves with the best moves from both sides.
+You may prefer to explore less best moves as the analysis progress. In this real example I prepared as white to face the Stafford gambit and wanted to find the single best answers to the four best moves black could play, then following my move I wanted to see what the 3 best follow-up were for my opponent, then the 2 best and finally I wanted to continue the variation for 6 moves with the best moves from both sides.
 
 To do so I used a _PVExpression_ of the form `X[+-]Y/Z[WB]`, which read like this : start at `X` best moves, then every `Z` plies add or substract `Y` to the current number of best moves kept and use this new number instead. It can be set independently for white and/or black by specifying `W` for white and `B` for black.
 
