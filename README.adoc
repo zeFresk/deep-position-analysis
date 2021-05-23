@@ -37,7 +37,7 @@ To do so, you need to https://www.howtogeek.com/235101/10-ways-to-open-the-comma
 
 Then you need to download the script. Please use one of the following methods to do so.
 
-==== i. git clone (RECOMMANDED)
+==== i. git clone (RECOMMENDED)
 
 Make sure https://git-scm.com/downloads[git] is installed, then clone the "master" branch of this repository, which should be stable.
 
