@@ -132,7 +132,7 @@ If a PGN is fed to the script the output file will contain all the content from 
 
 The total number of positions to analyze is given by the formula below:
 
-image::https://latex.codecogs.com/svg.image?%5Csum_%7Bd%20=%200%7D%5E%7B%5Ctext%7Bdepth%7D-1%7D%20(%5Ctext%7Bpv%7D)%5E%7Bd%7D[Equation]
+image::https://latex.codecogs.com/svg.image?%5Cbg_white%20%5Csum_%7Bd%20=%200%7D%5E%7B%5Ctext%7Bdepth%7D-1%7D%20(%5Ctext%7Bpv%7D)%5E%7Bd%7D[Equation]
 
 The **growth is exponential** with depth so if you want to go deeper, try to reduce _MULTIPV_ or increase threshold or cutoff using _PVExpression_, _ThresholdExpression_ or `--cutoff`.
 
