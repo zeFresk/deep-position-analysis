@@ -105,7 +105,7 @@ NOTE: 2 plies = 1 move. `--depth=4` will explore position 2 moves deep.
 
 - `--time` / `-t` : stop exploring **each node** after a set amount of time in **milliseconds**. _Stopping condition_.
 
-- `--ply-depth' / `-d` : stop exploring **each node** when the engine reached set depth in **plies**. _Stopping condition_.
+- `--ply-depth` / `-d` : stop exploring **each node** when the engine reached set depth in **plies**. _Stopping condition_.
 
 - `--threshold` : Don't explore lines if their scores are below set threshold. Can be different for white and black. Can also change during analysis. See ThresholdExpression. Value in **centipawns**.
 
