@@ -3,8 +3,9 @@ zeFresk
 v2.0, 2021-05-23
 :toclevels: 2
 :imagesdir: res/
+:toc: macro
 
-:toc:
+toc::[]
 
 == Introduction
 
@@ -237,17 +238,22 @@ WARNING: Cached lines are bound to a specific engine using a specific configurat
 
 This README aims to be a quick and esay follow summary, if you would like to know more about a parameter, the caching system, or everything else, feel free to visit the wiki.
 
-== I found a bug
+== Contributing
 
-=== Are you using python 2 ?
-**Then use python 3 and don't forget the dependencies.**
+=== I found a bug
 
-=== It's taking too long !
+==== Are you using python 2 ?
 
-The total amount of nodes calculated is going to be ![equation2](https://i.imgur.com/by3dVO0.png), where *npm* is the number of nodes per move.
+Then use python 3 and don't forget the dependencies.
 
-The growth is exponential, so try lowering the node count, the pv, or the depth.
-
-=== It's a bug I know it
+==== It's a bug I know it
 
 Submit an issue and I will try to fix it :)
+
+=== Submit changes
+
+If you implemented something cool please don't hesitate to create a Merge Request, I will take a look and hopefully incorporate your branch !
+
+=== Enhancement
+
+If you have a functionnality you would like to see implemented, feel free to submit an issue detailing what you would like to see, how it would work and everything you deemed relevant. Then I will try to add it.
