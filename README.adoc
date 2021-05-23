@@ -1,0 +1,253 @@
+= Deep Position Analysis or DPA
+zeFresk
+v2.0, 2021-05-23
+:toclevels: 2
+:imagesdir: res/
+
+:toc:
+
+== Introduction
+
+Chess engines are very powerful and nowadays everyone can get GM-level opening preparation using them. However, at the time I started this project, no free tool existed which could generate a *tree of all the best move from a given position recursively*.
+
+You had to manually check the 4 best moves according to Stockfish, then explore each one of them manually, and so on for hundreds of lines. This process is very time consuming and this project aim to solve this issue by automating everything while giving a lot of control on which lines to explore or not.
+
+This is not only about openings and preparations, this tool can be used to generate a *tree of any depth, any width, from any given position* and can be useful to study endgames or explore complex positions arising from the middlegame.
+
+NOTE: _DPA_ aims to be a free, open-source and better version of _DeA_ from _Fitz_.
+
+---
+
+== How to install
+
+=== 1. Install Python and pip
+
+You need to have https://www.python.org/downloads/[Python 3] installed as well as https://pip.pypa.io/en/stable/installing/[pip] to run and install dependencies.
+
+NOTE: On Windows, pip is installed alongside Python.
+
+=== 2. Install dependencies
+
+After pip is installed, you need to install the https://python-chess.readthedocs.io/en/latest/[python-chess] package in version _0.23.10_. +
+To do so, you need to https://www.howtogeek.com/235101/10-ways-to-open-the-command-prompt-in-windows-10/[open a terminal] and type the following command :
+
+> pip install python-chess==0.23.10
+
+=== Get the script
+
+Then you need to download the script. Please use one of the following methods to do so.
+
+==== i. git clone (RECOMMANDED)
+
+Make sure https://git-scm.com/downloads[git] is installed, then clone the "master" branch of this repository, which should be stable.
+
+> git clone https://github.com/zeFresk/deep-position-analysis
+
+A new directory called "deep-position-analysis" containing all you need should have been created.
+
+==== ii. Download zip from github
+
+Alternatively, you can download an archive directly from GitHub and extract it.
+
+image::demo_github.gif[How to download zip GIF]
+
+---
+
+== Overview
+
+Using _DPA_, it is possible to :
+
+- Analyze any **fen** or **epd** position with **any installed engine**.
+
+- Analyze **pgn files**, the analysis will start at the last position from main line.
+
+- **Intelligent caching** of analyzed lines to speedup future analyses and prevent loss in case of early stopping.
+
+- Generate a tree of a given **depth** (*be carefull it grows exponentially*)
+
+- Choose the number of best moves to explore (**MultiPV**), and change it during analysis.
+
+- Choose between exploring each position for X **nodes**, X **seconds** or X **depth** inside the engine.
+
+- Customizable **threshold** to stop exploring after a side gained the upper hand.
+
+- Change **engine configuration** in depth using config files.
+
+- Analyze **multiple games/positions per file**.
+
+- Analyze **multiple files**.
+
+== How to use
+
+=== Basics
+
+_DPA_ is a command line program, therefore you will have to open a terminal inside the 'deep-position-analysis' and write a command using the available options.
+
+A typical call to _DPA_ looks like this :
+
+> python3 dpa.py -p engine [parameter(s)] <FILE1> [... <FILEN>]
+
+TIP: use `--help` to show a list of all the available parameters.
+
+=== Parameters
+
+Here is a list of all the parameters available, you can click on one of them if you would like to know more.
+
+- `-p` / `--engine` : path to chess engine [**required**]
+
+- `--depth` : tree depth **in plies**.
+
+NOTE: 2 plies = 1 move. `--depth=4` will explore position 2 moves deep.
+
+- `--pv` : Number of best moves to explore at each node.Can be dynamic and change during analysis, see PVExpression. Equivalent to **multiPV** in UCI settings.
+
+- `--nodes` / `-n` : stop exploring **each node** after a set amount of nodes. _Stopping condition_.
+
+- `--time` / `-t` : stop exploring **each node** after a set amount of time in **milliseconds**. _Stopping condition_.
+
+- `--ply-depth' / `-d` : stop exploring **each node** when the engine reached set depth in **plies**. _Stopping condition_.
+
+- `--threshold` : Don't explore lines if their scores are below set threshold. Can be different for white and black. Can also change during analysis. See ThresholdExpression. Value in **centipawns**.
+
+- `--appending` : append the **full line** calculated by the engine to every terminal node.
+
+ - `--cutoff` / `-k` : Don't explore lines if their score is below the best line by more than a set amount in **centipawns**.
+
+- `--config` / `-c` : Use specified engine config.
+
+- `--no-cache` : Don't use the cache.
+
+CAUTION: Setting this option is not recommended as all calculated lines will be lost if you stop the program mid-analysis.
+
+- *a file* in epd or fen format **OR** a *pgn* (the analysis will start from the last node of the main line)
+
+To edit the engine *uci config*, edit the .cfg created in the directory after the first use of the said engine.
+
+==== About PGN
+
+If a PGN is fed to the script the output file will contain all the content from the original PGN and the analysis (starting from the last node of the main line) will be **appended at the end**.
+
+==== Important: exponential growth
+
+The total number of positions to analyze is given by the formula below:
+
+image::https://latex.codecogs.com/gif.download?%5Csum_%7Bd%3D0%7D%5E%7Bdepth%20-%201%7D%20%28pv%29%5E%7Bd%7D[Equation]
+
+The **growth is exponential** with depth so if you want to go deeper, try to reduce _MULTIPV_ or increase threshold or cutoff using _PVExpression_, _ThresholdExpression_ or `--cutoff`.
+
+---
+
+== Examples
+
+=== Basic: constant depth and PV, stopping after X nodes or after Y seconds
+
+> python3 dpa.py -p "C:/Engines/stockfish 10/stockfish_10_x64.exe" --pv=2 --depth 3 --nodes 1000000 --appending sicilian.epd
+
+The following line will analyse the **2 best moves** for each position and do so for **3 plies**. Each variation will be analysed with Stockfish until **1000000 nodes** are analysed inside the engine.
+
+It will generate a .pgn of 7 nodes where each node will be the best move selected after 1M nodes by stockfish 10.
+
+```
+                                _(best move)
+                               /
+           _(best move)--------
+	  /                    \_(second best move)
+	 /
+(start) -                       _(best move)
+         \                     /
+	  \_(second best move)-
+	                       \_(second best move)
+```
+
+To use time instead of nodes as a stopping condition, replace `--nodes 1000000` by `--time 1000` if you want the engine to ponder on each line for **1 second** before exploring another line.
+
+WARNING: Using time instead of nodes may disable some optimizations such as _pruning_ inside the engine itself and slow down the analysis. See <<About --time, About --time>>.
+
+=== Basic: constant depth and PV, ignore bad positions
+
+> python3 dpa.py -p **--threshold 100** "C:/Engines/stockfish 10/stockfish_10_x64.exe" --pv=2 --depth 3 --nodes 1000000 --appending sicilian.epd
+
+Often you may want to explore all good moves in a position and the good answers to those moves.
+
+"Good" positions can be defined using `--threshold` and setting a value in centipawns. For example, if you want to ignore position which score are below _-1_ or above _+1_, you could add `--threshold 100` to the parameters.
+
+Now, if you would like to explore online good positions for white you could use
+
+> --threshold 100W
+
+Now the score range is ]-infinity, 100]. You could also specify a threshold for black only using :
+
+> --threshold 100B
+
+Or **set one threshold for each color**:
+
+> --threshold 100W200B
+> or
+> --threshold 200B100W
+
+Which result in positions within the range [-200, 100].
+
+NOTE: Here the score is the position's score, consequently analysing extreme positions may cause problems. To exclude bad moves and not bad positions, see xref:bad-moves[filter out bad moves].
+
+=== Basic: constant depth and PV, ignore blunders or bad moves
+
+> python3 dpa.py **--threshold 100** -p "C:/Engines/stockfish 10/stockfish_10_x64.exe" --pv=2 --depth 3 --nodes 1000000 --appending sicilian.epd
+
+anchor:bad-moves[]
+
+Sometimes you may want to keep moves only if they aren't blunders or inaccuracies. What it means is that you want to filter out all moves which aren't within X centipawns from the best move. For example, if the best move results in a score of -5, a second move with a score of -5.3 is an inaccuracy if you're playing white, whereas a move which results in a forced checkmate for your opponent is a straight-up blunder.
+
+This interval can be set using `--cutoff X` where X is a value in centipawns. If you think a blunder is a move which lose 1 pawn then adding `--cutoff 100` will make sure the blunders are not analyzed further.
+
+NOTE: You can set a different for each color the same way as you would for a threshold: `--cutoff 100W200B`.
+
+=== Basic: Different number of best moves for black and white
+
+> python3 dpa.py -p "C:/Engines/stockfish 10/stockfish_10_x64.exe" **--pv 4W1B** --depth 3 --nodes 1000000 --appending sicilian.epd
+
+You may want to explore the four best moves for white, but only their single best answer from black. You may do so using a simple _PVExpression_ the same way as you would set an asymmetric threshold :
+
+> --pv 4W1B
+> or
+> --pv 1B4W
+
+You can also change this parameter as you go deeper inside the tree using a _PVExpression_.
+
+=== Advanced: Reduce the number of best moves explored as you go deeper
+
+> python3 dpa.py --engine lc0 **--pv 1W4-1/1B** --depth 18 --nodes 10000000 --threshold 5 --appending stafford.pgn
+
+You may like to explore less best moves as the analysis progress. In this real example I prepared as white to face the Stafford gambit and wanted to find the single best answers to the four best moves black could play, then following my move I wanted to see what the 3 best follow-up were for my opponent, then the 2 best and finally I wanted to continue the variation for 6 moves with the best moves from both sides.
+
+To do so I used a _PVExpression_ of the form `X[+-]Y/Z[WB]`, which read like this : start at `X` best moves, then every `Z` plies add or substract `Y` to the current number of best moves kept and use this new number instead. It can be set independently for white and/or black by specifying `W` for white and `B` for black.
+
+In practice, if you would like to explore the 8 best moves for white from the starting position, but then only continue those 8 variations using the best possible moves, you would use:
+
+> --pv 8-7/1W1B
+
+== Engine configuration
+
+The first time you use an engine, a new file name `<Engine name>.cfg` will be created, this file can then be edited to set every option exposed by the engine.
+
+It is possible to juggle with multiple configurations using the parameter `--config <path_to_config>`.
+
+WARNING: Cached lines are bound to a specific engine using a specific configuration, as such, changing the config may force to recalculate lines.
+
+== More informations
+
+This README aims to be a quick and esay follow summary, if you would like to know more about a parameter, the caching system, or everything else, feel free to visit the wiki.
+
+== I found a bug
+
+=== Are you using python 2 ?
+**Then use python 3 and don't forget the dependencies.**
+
+=== It's taking too long !
+
+The total amount of nodes calculated is going to be ![equation2](https://i.imgur.com/by3dVO0.png), where *npm* is the number of nodes per move.
+
+The growth is exponential, so try lowering the node count, the pv, or the depth.
+
+=== It's a bug I know it
+
+Submit an issue and I will try to fix it :)
